@@ -1,0 +1,161 @@
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, real, primaryKey, index } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+import { permission } from 'node:process';
+
+
+export const users = pgTable('users', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    username: text('username').unique().notNull(),
+    email: text('email').unique().notNull(),
+    passwordHash: text('password_hash'),
+    roleId: uuid('role_id').references(() => roles.id).notNull(),
+    mfaSecret: text('mfa_secret'),
+    mfaEnabled: boolean('mfa_enabled').default(false),
+    storageQuota: integer('storage_quota'),
+    storageUsed: integer('storage_used').default(0),
+    isSuspended: boolean('is_suspended').default(false),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    UpdatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const roles = pgTable('roles', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').unique().notNull(),
+    isSystem: boolean('is_system').default(false),
+    permissions: jsonb('permissions').notNull().$type<{
+        can_upload: boolean; // need to change , so just a reminder for myself
+    }>(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const sessions = pgTable('sessions', {
+    id: text('id').primaryKey(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    deviceInfo: text('device_info').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+});
+
+export const storageBackends = pgTable('storage_backends', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    config: jsonb('config').notNull(),
+    isDefault: boolean('is_defailt').default(false),
+    status: text('status').default('online'),
+    createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+export const platformConfig = pgTable('platform_config', {
+    key: text('key').primaryKey(),
+    value: jsonb('value').notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const media = pgTable('media', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    storageBackendId: uuid('storage_backend_id').references(() => storageBackends.id),
+    filename: text('filename').notNull(),
+    mimetype: text('mimetype').notNull(),
+    size: integer('size').notNull(),
+    hash: text('hash').notNull(),
+    objectKey: text('object_key').notNull(),
+    thumbnails: jsonb('thumbnails').notNull().$type<{
+        small?: string;
+        medium?: string;
+        large?: string;
+    }>(),
+
+    width: integer('width'),
+    height: integer('height'),
+    duration: real('duration'),
+    dateTaken: timestamp('date_taken'),
+    cameraModel: text('camera_model'), // idk if this should be here
+    lensModel: text('lens_model'), // idk if this should be here
+    gpsLat: real('gps_lat'),
+    gpsLng: real('gps_lng'),
+    caption: text('caption'),
+    isArchived: boolean('is_archived').default(false),
+    isFavorited: boolean('is_favorited').default(false),
+    isDeleted: boolean('is_deleted').default(false),
+    isEncrypted: boolean('is_encrypted').default(true),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => [index('media_owner_idx').on(table.ownerId), index('media_date_taken_idx').on(table.dateTaken)]);
+
+export const albums = pgTable('albums', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    coverMediaId: uuid('cover_media_id').references(() => media.id),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const albumMedia = pgTable('album_media', {
+    albumId: uuid('album_id').references(() => albums.id, { onDelete: 'cascade' }).notNull(),
+    mediaId: uuid('media_id').references(() => media.id, { onDelete: 'cascade' }).notNull(),
+    addedAt: timestamp('added_at').defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.albumId, t.mediaId] })]);
+
+export const albumContributors = pgTable('album_contributors', {
+    albumId: uuid('album_id').references(() => albums.id, { onDelete: 'cascade' }).notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    grantedAt: timestamp('granted_at').defaultNow().notNull(),
+
+}, (t) => [primaryKey({ columns: [t.albumId, t.userId] })]);
+
+export const tags = pgTable('tags', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    name: text('name').notNull(),
+});
+
+export const mediaTags = pgTable('media_tags', {
+    mediaId: uuid('media_id').references(() => media.id, { onDelete: 'cascade' }).notNull(),
+    tagId: uuid('tag_id').references(() => tags.id, { onDelete: 'cascade' }).notNull(),
+}, (t) => [primaryKey({ columns: [t.mediaId, t.tagId] })]);
+
+export const shareLinks = pgTable('share_links', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    targetType: text('target_type').notNull(),
+    targetId: uuid('target_id').notNull(),
+    linkToken: text('link_token').unique().notNull(),
+    isPublic: boolean('is_public').default(true),
+    passwordHash: text('password_hash'),
+    allowDownload: boolean('allow_download').default(true),
+    viewCount: integer('view_count').default(0),
+    expiresAt: timestamp('expires_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const auditLogs = pgTable('audit_logs', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    actorId: uuid('actor_id').references(() => users.id),
+    action: text('action').notNull(),
+    targetType: text('target_type'),
+    targetId: text('target_id'),
+    details: jsonb('details'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const userRelations = relations(users, ({ one, many }) => ({
+    role: one(roles, { fields: [users.roleId], references: [roles.id] }),
+    media: many(media),
+    albums: many(albums),
+}));
+
+export const mediaRelations = relations(media, ({ one, many }) => ({
+    owner: one(users, { fields: [media.ownerId], references: [users.id] }),
+    storageBackend: one(storageBackends, { fields: [media.storageBackendId], references: [storageBackends.id]
+}),
+  tags: many(mediaTags),
+  albums: many(albumMedia),
+}));
+
+export const albumRelations = relations(albums, ({ one, many }) => ({
+    owner: one(users, { fields: [albums.ownerId], references: [users.id] }),
+    media: many(albumMedia),
+    contributors: many(albumContributors),
+}));
