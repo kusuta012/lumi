@@ -4,7 +4,8 @@ import { db } from "@/db";
 import { media } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
-
+import { mediaQueue } from "@/lib/queue"
+ 
 export async function recordMediaUpload(data: {
     filename: string;
     mimetype: string;
@@ -15,14 +16,15 @@ export async function recordMediaUpload(data: {
     if (!session?.user?.id) throw new Error("Unauthorized");
     
     try {
-        await db.insert(media).values({
+        const [newMedia] = await db.insert(media).values({
             ownerId: session.user.id,
-            filename: data.filename,
-            mimetype: data.mimetype,
-            size: data.size,
-            objectKey: data.objectKey,
-            hash: "pending",
-        });
+                filename: data.filename,
+                mimetype: data.mimetype,
+                size: data.size,
+                objectKey: data.objectKey,
+                hash: "pending",
+        }).returning();
+        await mediaQueue.add('process', { mediaId: newMedia.id });
 
         revalidatePath("/photos");
         return { success: true};
