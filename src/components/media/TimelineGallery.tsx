@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function TimelineGallery({ initialMedia, startYear, endYear }: Props) {
-    const [selectedItem, setSelectedItem] = useState<any | null>(null);
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
     const groupedMedia = initialMedia.reduce<Record<string, MediaItem[]>>((acc, item) => {
         const dateKey = new Date(item.dateTaken || item.createdAt).toLocaleDateString('en-US', {
@@ -41,7 +41,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear }: Pr
                             <h2 className="text-sm font-semibold text-neutral-300 mb-4 sticky top-0 py-2 bg-[#0a0a0a]/80 backdrop-blur-md z-10">{date}</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
                                 {items.map((item) => (
-                                    <div key={item.id} onClick={() => setSelectedItem(item)} className="relative group aspect-square bg-neutral-900 overflow-hidden cursor-pointer hover:ring-2 ring-orange-500 transition-all">
+                                    <div key={item.id} onClick={() => setSelectedIndex(initialMedia.indexOf(item))} className="relative group aspect-square bg-neutral-900 overflow-hidden cursor-pointer hover:ring-2 ring-orange-500 transition-all">
                                         <img src={`/api/media/${item.id}?size=small`} alt={item.filename} className="w-full h-full object-cover transition-transform duration-500 group:hover:scale-110" loading="lazy" />
                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200" />
                                     </div>
@@ -61,8 +61,8 @@ export default function TimelineGallery({ initialMedia, startYear, endYear }: Pr
                 </div>
                 <span>{endYear}</span>
             </div>
-            {selectedItem && (
-                <Lightbox item={selectedItem} onClose={() => setSelectedItem(null)} />
+            {selectedIndex !== null && (
+                <Lightbox items={initialMedia} index={selectedIndex} setIndex={(i: number) => setSelectedIndex(i)} onClose={() => setSelectedIndex(null)} />
             )}
         </div>
     );

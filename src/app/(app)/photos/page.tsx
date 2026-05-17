@@ -11,7 +11,8 @@ export default async function PhotosPage() {
     const userMedia = await db.query.media.findMany({
         where: and(
             eq(media.ownerId, session.user.id),
-            eq(media.isDeleted, false)
+            eq(media.isDeleted, false),
+            eq(media.isArchived, false)
         ),
         orderBy: [desc(media.dateTaken), desc(media.createdAt)],
     });

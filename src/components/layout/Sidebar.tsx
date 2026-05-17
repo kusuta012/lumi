@@ -1,9 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import {
     Image as ImageIcon, Search, Map, Users, Heart, Library, Archive, Lock, Trash2, Info
 } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 export default function Sidebar() {
+    const pathname = usePathname();
     const navItems = [
         { icon: ImageIcon, label: "Photos", href: "/photos", active: true },
         { icon: Search, label: "Explore", href: "/explore" },
@@ -18,6 +22,7 @@ export default function Sidebar() {
         { icon: Lock, label: "Locked Folder", href: "/locked" },
         { icon: Trash2, label: "Trash", href: "/trash" },
     ];
+    const isActive = (path: string) => pathname === path;
 
     return (
         <aside className="w-64-bg-[#0a0a0a] flex flex-col border-r border-neutral-900 h-full">
@@ -30,7 +35,7 @@ export default function Sidebar() {
             <div className="flex-1 overflow-y-auto py-4 px-3 space-y-8 custom-scrollbar">
                 <nav className="space-y-1">
                     {navItems.map((item) => (
-                        <Link key={item.label} href={item.href} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${item.active ? 'bg-neutral-800/80 text-blue-400' : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'}`}>
+                        <Link key={item.label} href={item.href} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${isActive(item.href) ? 'bg-neutral-800/80 text-orange-400' : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'}`}>
                             <item.icon className="w-5 h-5"/>
                             {item.label}
                         </Link>
@@ -41,7 +46,7 @@ export default function Sidebar() {
                     <h3 className="px-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">Library</h3>
                     <nav className="space-y-1">
                         {libraryItems.map((item) => (
-                            <Link key={item.label} href={item.href} className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200">
+                            <Link key={item.label} href={item.href} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${isActive(item.href) ? 'bg-orange-500/10 text-orange-500' : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'}`}>
                                 <item.icon className="w-5 h-5" />
                                 {item.label}
                             </Link>
