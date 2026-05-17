@@ -14,19 +14,19 @@ services:
   redis:
     image: redis:latest
     ports:
-      - "6379:6379"
+      - "4567:6379"
     volumes:
       - redis_data:/data
   
   minio:
     image: minio/minio:latest
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":5001"
     ports:
-      - "5000:5000"
+      - "5000:9000"
       - "5001:5001"
     environment:
-      - MINIO_ROOT_USER= admin
-      - MINIO_ROOT_PASSWORD= saws
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: sawssawssaws
     volumes:
       - minio_data:/data
 

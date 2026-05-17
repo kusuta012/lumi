@@ -23,7 +23,15 @@ export const roles = pgTable('roles', {
     name: text('name').unique().notNull(),
     isSystem: boolean('is_system').default(false),
     permissions: jsonb('permissions').notNull().$type<{
-        can_upload: boolean; // need to change , so just a reminder for myself
+        can_manage_users: boolean;
+        can_manage_server: boolean;
+        can_view_analytics: boolean;
+        can_change_config: boolean;
+        can_manage_flippers: boolean;
+        can_view_audit_log: boolean;
+        can_manage_others_albums: boolean;
+        can_view_all_media: boolean;
+        can_override_quota: boolean;
     }>(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
@@ -60,11 +68,11 @@ export const media = pgTable('media', {
     size: integer('size').notNull(),
     hash: text('hash').notNull(),
     objectKey: text('object_key').notNull(),
-    thumbnails: jsonb('thumbnails').notNull().$type<{
+    thumbnails: jsonb('thumbnails').$type<{
         small?: string;
         medium?: string;
         large?: string;
-    }>(),
+    } | null>().default(null),
 
     width: integer('width'),
     height: integer('height'),

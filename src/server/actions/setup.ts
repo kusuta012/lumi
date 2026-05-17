@@ -25,7 +25,15 @@ export async function completeSetupAction(prevState: any, formData: FormData) {
             name: 'Super Admin',
             isSystem: true, 
             permissions: {
-                can_upload: true,
+                can_manage_users: true,
+                can_manage_server: true,
+                can_view_analytics: true,
+                can_change_config: true,
+                can_manage_flippers: true,
+                can_view_audit_log: true,
+                can_manage_others_albums: true,
+                can_view_all_media: true,
+                can_override_quota: true,
             }
         }).returning();
 
