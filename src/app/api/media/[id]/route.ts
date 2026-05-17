@@ -14,7 +14,7 @@ export async function GET(
 
     const { id } = await params;
     const { searchParams } = new URL(req.url);
-    const size = searchParams.get("size") || "small";
+    const size = searchParams.get("size") || "original";
     const item = await db.query.media.findFirst({
         where: eq(media.id, id),
     });
@@ -31,6 +31,25 @@ export async function GET(
             if (thumbs[size]) {
                 objectKey = thumbs[size];
             }
+        }
+
+        const range = req.headers.get("range");
+        if (item.mimetype.startsWith("video/") && range && size === "original") {
+            const stat = await minioClient.statObject(BUCKET_NAME, objectKey);
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start  = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+
+            const stream = await minioClient.getPartialObject(BUCKET_NAME, objectKey, start, end - start + 1);
+            return new NextResponse(stream as any, {
+                status: 206,
+                headers: {
+                    "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+                    "Accept-Range": "bytes",
+                    "Content-Length": (end - start + 1).toString(),
+                    "Content-Type": item.mimetype,
+                },
+            });
         }
 
         const dataStream = await minioClient.getObject(BUCKET_NAME, objectKey);

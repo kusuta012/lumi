@@ -104,12 +104,16 @@ export default function Lightbox({ items, index, setIndex, onClose }: LightboxPr
                         </button>
                     )}
                     
-                    <img 
+                    {item.mimetype.startsWith("video/") ? (
+                        <video key={item.id} src={`/api/media/${item.id}?size=original`} controls autoPlay className="max-w-full max-h-full outline-none shadow-2xl" />
+                    ) : (
+                        <img 
                         key={item.id} 
                         src={`/api/media/${item.id}?size=large`} 
                         className="max-w-full max-h-full object-contain select-none animate-in zoom-in-95 duration-300" 
                         alt={item.filename} 
                     />
+                    )}
 
                     {index < items.length - 1 && (
                         <button onClick={goNext} className="absolute right-6 p-3 rounded-full bg-white/5 text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
