@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Lightbox from "./Lightbox";
 import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw } from "lucide-react";
 import AddToAlbumModal from "./AddToAlbumModal";
-import { restoreMediaAction, deletePermanentlyAction } from "@/server/actions/media-mutations";
+import { restoreMediaAction, deletePermanentlyAction, bulkMoveToTrashAction } from "@/server/actions/media-mutations";
 import { clear } from "console";
 
 interface MediaItem {
@@ -76,6 +76,13 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         });
     };
 
+    const handleBulkTrash = () => {
+        startTransition(async () => {
+            await bulkMoveToTrashAction(selectedIds);
+            clearSelection();
+        });
+    };
+
     return(
         <div className="p-6 pb-24 relative">
             {isSelectionMode && (
@@ -104,7 +111,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                         <button className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors">
                             <Share2 size={18} />
                         </button>
-                        <button className="flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors">
+                        <button onClick={handleBulkTrash} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors">
                             <Trash2 size={18} />
                         </button> 
                             </>

@@ -1,9 +1,9 @@
 "use client";
 
-import { X, Calendar, Camera, MapPin, FileText, Heart, Trash2, Info, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical } from "lucide-react";
+import { X, Calendar, Camera, MapPin, FileText, Heart, Trash2, Info, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive } from "lucide-react";
 import { format } from "date-fns";
 import { useTransition, useState, useEffect } from "react";
-import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction } from "@/server/actions/media-mutations";
+import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction } from "@/server/actions/media-mutations";
 import { useRouter } from "next/navigation";
 
 interface LightboxProps {
@@ -18,13 +18,17 @@ export default function Lightbox({ items, index, setIndex, onClose }: LightboxPr
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showInfo, setShowInfo] = useState(false);
-    const [isFav, setIsFav] = useState(item.isFavorited);
-    const [isArchived, setIsArchived] = useState(item.isArchived);
+    const [isFav, setIsFav] = useState(item?.isFavorited ?? false);
+    const [isArchived, setIsArchived] = useState(item?.isArchived ?? false);
 
     useEffect(() => {
+        if (!item) {
+            onClose();
+            return;
+        }
         setIsFav(item.isFavorited);
         setIsArchived(item.isArchived);
-    }, [item]);
+    }, [item, onClose]);
 
     const goNext = () => index < items.length - 1 && setIndex(index + 1);
     const goPrev = () => index > 0 && setIndex(index - 1);
@@ -77,6 +81,24 @@ export default function Lightbox({ items, index, setIndex, onClose }: LightboxPr
         }
     };
 
+    const handleRestore = () => {
+        startTransition(async () => {
+            await restoreMediaAction([item.id]);
+            onClose();
+            router.refresh();
+        });
+    };
+
+    const handlePermanentDelete = () => {
+        if (confirm("Permanently delete this item? This cannot be undone.")) {
+            startTransition(async () => {
+                await deletePermanentlyAction([item.id]);
+                onClose();
+                router.refresh();
+            });
+        }
+    };
+    if (!item) return null;
     return (
         <div className="fixed inset-0 z-[100] bg-black flex overflow-hidden animate-in fade-in duration-200">
             <div className="flex-1 relative flex flex-col h-full overflow-hidden">
@@ -86,15 +108,27 @@ export default function Lightbox({ items, index, setIndex, onClose }: LightboxPr
                     </button>
 
                     <div className="flex items-center gap-1 sm:gap-2">
-                        {/* <IconButton icon={<Share2 size={20} />} onClick={() => { }} /> */}
+                        
                         <IconButton icon={<Maximize2 size={20} />} onClick={() => document.documentElement.requestFullscreen()} />
                         <IconButton icon={<Copy size={20} />} onClick={handleCopy} />
                         <IconButton icon={<Download size={20} />} onClick={handleDownload} />
                         <IconButton icon={<Info size={20} />} onClick={() => setShowInfo(!showInfo)} active={showInfo} />
-                        <IconButton icon={<Heart size={20} className={isFav ? "fill-red-500 text-red-500" : ""} />} onClick={() => handleAction('fav')} disabled={isPending} />
-                        {/* <IconButton icon={<SlidersHorizontal size={20} />} onClick={() => { }} /> */}
-                        <IconButton icon={<Trash2 size={20} />} onClick={() => handleAction('trash')} disabled={isPending} className="text-red-400 hover:text-red-500" />
-                        {/* <IconButton icon={<MoreVertical size={20} />} onClick={() => { }} /> */}
+                        
+                        {item.isDeleted ? (
+                            <>
+                                <IconButton icon={<RefreshCcw size={20} />} onClick={handleRestore} disabled={isPending} className="text-emerald-400" />
+                                <IconButton icon={<Trash2 size={20} />} onClick={handlePermanentDelete} disabled={isPending} className="text-red-500" />
+                            </>
+                        ) : (
+                            <>
+                                {/* <IconButton icon={<Share2 size={20} />} onClick={() => { }} /> */}
+                                <IconButton icon={<Heart size={20} className={isFav ? "fill-red-500 text-red-500" : ""} />} onClick={() => handleAction('fav')} disabled={isPending} />
+                                <IconButton icon={<Archive size={20} className={isArchived ? "fill-blue-500 text-blue-500" : ""} />} onClick={() => handleAction('archive')} disabled={isPending} />
+                                {/* <IconButton icon={<SlidersHorizontal size={20} />} onClick={() => { }} /> */}
+                                <IconButton icon={<Trash2 size={20} />} onClick={() => handleAction('trash')} disabled={isPending} className="text-red-400 hover:text-red-500" />
+                                {/* <IconButton icon={<MoreVertical size={20} />} onClick={() => { }} /> */}
+                            </>
+                        )}
                     </div>
                 </div>
                 <div className="flex-1 relative flex items-center justify-center group">

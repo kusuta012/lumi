@@ -23,7 +23,7 @@ export default async function AlbumDetailPage({ params }: { params: Promise<{ id
     const mediaIds = links.map(l => l.mediaId);
     const albumPhotos = mediaIds.length > 0
         ? await db.query.media.findMany({
-            where: inArray(media.id, mediaIds),
+            where: and(inArray(media.id, mediaIds), eq(media.isDeleted, false)),
             orderBy: [desc(media.dateTaken), desc(media.createdAt)]
         })
         : [];

@@ -2,6 +2,7 @@ import { db } from "@/db"
 import { media } from "@/db/schema"
 import {eq, desc, and, isNotNull } from "drizzle-orm";
 import { auth } from "@/server/auth";
+import { Heart } from "lucide-react";
 import TimelineGallery from "@/components/media/TimelineGallery";
 
 export default async function FavoritesPage() {
@@ -20,7 +21,10 @@ export default async function FavoritesPage() {
     return (
         <div>
             <div className="px-6 py-8 border-b border-neutral-900">
-                <h1 className="text-2xl font-bold text-white">Favorites</h1>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                    <Heart className="text-orange-500 w-5 h-5"/>
+                    Favorites
+                </h1>
             </div>
             <TimelineGallery initialMedia={items as any} startYear={startYear} endYear={endYear} / >
         </div>
