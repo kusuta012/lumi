@@ -39,7 +39,7 @@ export default async function SearchPage({
                 </p>
             </div>
 
-            <TimelineGallery initialMedia={results} startYear={startYear} endYear={endYear} />
+            <TimelineGallery initialMedia={results as any} startYear={startYear} endYear={endYear} />
         </div>
     );
 }

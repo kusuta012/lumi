@@ -13,13 +13,17 @@ export default async function TrashPage() {
         orderBy: [desc(media.deletedAt)],
     });
 
+    const years = items.map(m => new Date(m.dateTaken || m.createdAt).getFullYear());
+    const startYear = years.length > 0 ? Math.max(...years) : new Date().getFullYear();
+    const endYear = years.length > 0 ? Math.min(...years) : startYear;
+
     return (
         <div>
             <div className="px-6 py-8 border-b border-neutral-900">
                 <h1 className="text-2xl font-bold text-white">Trash</h1>
                 <p className="text-sm text-neutral-500 mt-1">Items here will be permanently deleted after 30 days</p>
             </div>
-            <TimelineGallery initialMedia={items} startYear={2000} endYear={new Date().getFullYear()} / >
+            <TimelineGallery initialMedia={items as any} startYear={startYear} endYear={endYear} emptyMessage="Trash is empty" isTrashPage={true} / >
         </div>
     );
 }

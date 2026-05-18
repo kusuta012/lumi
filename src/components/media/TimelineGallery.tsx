@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Lightbox from "./Lightbox";
-import { Check, CheckCircle2, Plus, Share2, Trash2, X } from "lucide-react";
+import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw } from "lucide-react";
 import AddToAlbumModal from "./AddToAlbumModal";
+import { restoreMediaAction, deletePermanentlyAction } from "@/server/actions/media-mutations";
+import { clear } from "console";
 
 interface MediaItem {
     id: string,
@@ -24,10 +26,11 @@ interface Props {
     startYear: number;
     endYear: number;
     emptyMessage?: string;
+    isTrashPage?: boolean;
 
 }
 
-export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage = "No photos yet" }: Props) {
+export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false }: Props) {
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [showAlbumModal, setShowAlbumModal] = useState(false);
@@ -57,6 +60,21 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     };
 
     const clearSelection = () => setSelectedIds([]);
+    const [isPending, startTransition] = useTransition();
+    const handleRestore = () => {
+        if (!confirm(`Restore ${selectedIds.length} items?`)) return;
+        startTransition(async () => {
+            await restoreMediaAction(selectedIds);
+            clearSelection();
+        });
+    };
+    const handleDeletePermanently = () => {
+        if (!confirm(`Permanently delete ${selectedIds.length} items? This annot be undone`)) return;
+        startTransition(async () => {
+            await deletePermanentlyAction(selectedIds);
+            clearSelection();
+        });
+    };
 
     return(
         <div className="p-6 pb-24 relative">
@@ -69,7 +87,18 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                         <span className="text-sm font-bold text-white">{selectedIds.length} selected</span>
                     </div>
                     <div className="flex items-center gap-5">
-                        <button onClick={() => setShowAlbumModal(true)} className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-orange-500 transition-colors">
+                        {isTrashPage ? (
+                            <>
+                                <button onClick={handleRestore} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-emerald-400 hover:text-emerald-300 transition-colors">
+                                    <RefreshCcw size={18} /> Restore
+                                </button>
+                                <button onClick={handleDeletePermanently} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-red-500 hover:text-red-400 transition-colors">
+                                    <Trash2 size={18} /> Delete forever
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                            <button onClick={() => setShowAlbumModal(true)} className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-orange-500 transition-colors">
                             <Plus size={18} />
                         </button>
                         <button className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors">
@@ -77,7 +106,9 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                         </button>
                         <button className="flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors">
                             <Trash2 size={18} />
-                        </button>   
+                        </button> 
+                            </>
+                        )}  
                     </div>
                 </div>
             )}
