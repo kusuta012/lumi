@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import {
-    Image as ImageIcon, Search, Map, Users, Heart, Library, Archive, Lock, Trash2, Info
+    Image as ImageIcon, Search, Map, Users, Heart, Library, Archive, Lock, Trash2, Info, Hammer
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-export default function Sidebar() {
+interface SidebarProps {
+    userRole?: string;
+    storageUsed?: number;
+    storageQuota?: number;
+}
+
+export default function Sidebar({ userRole, storageUsed = 0, storageQuota = 5120 }: SidebarProps) {
     const pathname = usePathname();
     const navItems = [
         { icon: ImageIcon, label: "Photos", href: "/photos", active: true },
@@ -23,6 +29,7 @@ export default function Sidebar() {
         { icon: Trash2, label: "Trash", href: "/trash" },
     ];
     const isActive = (path: string) => pathname === path;
+    const percentUsed = Math.min(100, (storageUsed / storageQuota) * 100);
 
     return (
         <aside className="w-64-bg-[#0a0a0a] flex flex-col border-r border-neutral-900 h-full">
@@ -55,12 +62,22 @@ export default function Sidebar() {
                 </div>
             </div>
 
+            {userRole === "Super Admin" && (
+                <div>
+                    <nav className="space-y-1">
+                        <Link href="/admin" className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${isActive("/admin") ? 'bg-orange-500/10 text-orange-500' : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'}`}>
+                            <Hammer className="w-5 h-5" /> Admin
+                        </Link>
+                    </nav>
+                </div>
+            )}
+
             <div className="p-4 border-t border-neutral-900 shrink-0">
                 <div className="bg-neutral-900 rounded-lg p-4">
                     <p className="text-xs font-medium text-neutral-300 mb-1">Storage Space</p>
-                    <p className="text-[10px] text-neutral-500 mb-2">00g used 100gbs placeholder</p>
+                    <p className="text-[10px] text-neutral-500 mb-2">{(storageUsed / 1024).toFixed(2)} GB / {(storageQuota / 1024).toFixed(2)} GB</p>
                     <div className="w-full h-1 bg-neutral-800 rounded-full overflow-hidden">
-                        <div className="bg-orange-500 w-1/12 h-full rounded-full"></div>
+                        <div className="bg-orange-500 h-full transition-all duration-1000" style={{ width: `${percentUsed}%` }} />
                     </div>
                 </div>
                 <div className="flex items-center justify-between mt-4 text-[10px] text-neutral-500 px-1">

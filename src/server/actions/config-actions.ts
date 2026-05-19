@@ -16,7 +16,7 @@ export async function getRegistrationSetting() {
 
 export async function toggleRegistrationAction(currentStatus: boolean) {
     const session = await auth();
-    const roleName = String(!session?.user?.roleName || "")
+    const roleName = String(session?.user?.roleName || "")
     if (roleName !== "Super Admin") throw new Error("Unauthorized");
 
     const newValue = !currentStatus;

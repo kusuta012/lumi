@@ -1,10 +1,11 @@
 "use server";
 
 import { db } from "@/db";
-import { media } from "@/db/schema";
+import { media, users } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { mediaQueue } from "@/lib/queue"
+import { eq, sql } from "drizzle-orm"
  
 export async function recordMediaUpload(data: {
     filename: string;
@@ -16,17 +17,28 @@ export async function recordMediaUpload(data: {
     if (!session?.user?.id) throw new Error("Unauthorized");
     
     try {
-        const [newMedia] = await db.insert(media).values({
-            ownerId: session.user.id,
-                filename: data.filename,
-                mimetype: data.mimetype,
-                size: data.size,
-                objectKey: data.objectKey,
-                hash: "pending",
-        }).returning();
-        await mediaQueue.add('process', { mediaId: newMedia.id });
+        const sizeInMB = data.size > 0 ? Math.max(1, Math.round(data.size / (1024 * 1024))) : 0;
+        await db.transaction(async (tx) => {
+            const [newMedia] = await db.insert(media).values({
+                ownerId: session.user.id,
+                    filename: data.filename,
+                    mimetype: data.mimetype,
+                    size: data.size,
+                    objectKey: data.objectKey,
+                    hash: "pending",
+            }).returning();
+
+            await tx.update(users)
+                .set({
+                    storageUsed: sql`${users.storageUsed} + ${sizeInMB}`
+                })
+                .where(eq(users.id, session.user.id));
+            
+            await mediaQueue.add('process', { mediaId: newMedia.id });
+        });
 
         revalidatePath("/photos");
+        revalidatePath("/albums", "layout")
         return { success: true};
     }  catch (error) {
         console.error("database inset eror", error);

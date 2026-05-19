@@ -51,7 +51,8 @@ export async function publicRegisterAction(prevState: any, formData: FormData) {
             username,
             email,
             passwordHash,
-            roleId: defaultRole.id
+            roleId: defaultRole.id,
+            storageQuota: 5120
         });
 
         return { success: true };

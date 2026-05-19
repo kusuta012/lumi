@@ -1,12 +1,11 @@
     "use server";
 
     import { db } from "@/db";
-    import { albumMedia, media, albums } from "@/db/schema";
-    import { eq, and, inArray, notInArray, ne} from "drizzle-orm";
+    import { albumMedia, media, albums, users } from "@/db/schema";
+    import { eq, and, inArray, notInArray, sql} from "drizzle-orm";
     import { auth } from "@/server/auth";
     import { revalidatePath } from "next/cache";
     import { BUCKET_NAME, minioClient } from "@/lib/storage";
-    import { AwardIcon } from "lucide-react";
 
     async function verifyOwnership(mediaId: string) {
         const session = await auth();
@@ -62,10 +61,9 @@
     }
 
     export async function deletePermanentlyAction(mediaIds: string[]) {
-        if (!mediaIds || mediaIds.length === 0) return { success: true };
-
         const session = await auth();
         if (!session?.user?.id) throw new Error("Unauthorized");
+        if (!mediaIds || mediaIds.length === 0) return { success: true };
 
         const items = await db.select().from(media).where(
             and(
@@ -75,6 +73,9 @@
         );
 
         if (items.length === 0) return { success: true };
+
+        const totalBytes = items.reduce((acc, item) => acc + item.size, 0);
+        const totalMB = Math.round(totalBytes / (1024 * 1024));
 
         try {
             await db.transaction(async (tx) => {
@@ -106,6 +107,11 @@
                         inArray(media.id, mediaIds),
                         eq(media.ownerId, session.user.id)
                     ));
+                await tx.update(users)
+                    .set({
+                        storageUsed: sql`GREATEST(0, ${users.storageUsed} - ${totalMB})`
+                    })
+                    .where(eq(users.id, session.user.id));
             });
 
         for (const item of items) {
@@ -124,7 +130,7 @@
 
             revalidatePath("/trash");
             revalidatePath("/photos");
-            revalidatePath("/albums");
+            revalidatePath("/albums", "layout");
             return { success: true };
         } catch (error) {
             console.error("db delete error", error);
