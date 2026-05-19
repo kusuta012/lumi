@@ -1,9 +1,10 @@
 "use client";
 
-import { X, Calendar, Camera, MapPin, FileText, Heart, Trash2, Info, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive } from "lucide-react";
+import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Trash2, Info, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon } from "lucide-react";
 import { format } from "date-fns";
 import { useTransition, useState, useEffect } from "react";
 import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction } from "@/server/actions/media-mutations";
+import { updateAlbumAction } from "@/server/actions/album-actions";
 import { useRouter } from "next/navigation";
 
 interface LightboxProps {
@@ -11,9 +12,10 @@ interface LightboxProps {
     index: number;
     setIndex: (i: number) => void;
     onClose: () => void;
+    albumId?: string;
 }
 
-export default function Lightbox({ items, index, setIndex, onClose }: LightboxProps) {
+export default function Lightbox({ items, index, setIndex, onClose, albumId }: LightboxProps) {
     const item = items[index];
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -58,6 +60,16 @@ export default function Lightbox({ items, index, setIndex, onClose }: LightboxPr
             router.refresh();
         });
     };
+    
+    const handleSetCover = () => {
+        if (!albumId) return;
+        startTransition(async () => {
+            const res = await updateAlbumAction(albumId, { coverMediaId: item.id });
+            if(res.success) {
+                alert("Album cover updated!");
+            }
+        });
+    }
 
     const handleDownload = async () => {
         const res = await fetch(`/api/media/${item.id}?size=original`);
@@ -113,6 +125,13 @@ export default function Lightbox({ items, index, setIndex, onClose }: LightboxPr
                         <IconButton icon={<Copy size={20} />} onClick={handleCopy} />
                         <IconButton icon={<Download size={20} />} onClick={handleDownload} />
                         <IconButton icon={<Info size={20} />} onClick={() => setShowInfo(!showInfo)} active={showInfo} />
+                        {albumId && !item.isDeleted && (
+                            <IconButton icon={<ImageIcon size={20} />}
+                            onClick={handleSetCover}
+                            disabled={isPending}
+                            title="Set as Album Cover"
+                            />
+                        )}
                         
                         {item.isDeleted ? (
                             <>

@@ -27,10 +27,11 @@ interface Props {
     endYear: number;
     emptyMessage?: string;
     isTrashPage?: boolean;
+    albumId?: string;
 
 }
 
-export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false }: Props) {
+export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false, albumId }: Props) {
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [showAlbumModal, setShowAlbumModal] = useState(false);
@@ -160,7 +161,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                 <span>{endYear}</span>
             </div>
             {selectedIndex !== null && (
-                <Lightbox items={initialMedia} index={selectedIndex} setIndex={(i: number) => setSelectedIndex(i)} onClose={() => setSelectedIndex(null)} />
+                <Lightbox items={initialMedia} index={selectedIndex} setIndex={(i: number) => setSelectedIndex(i)} onClose={() => setSelectedIndex(null)} albumId={albumId} />
             )}
 
             {showAlbumModal && (

@@ -2,8 +2,9 @@ import { db } from "@/db"
 import { eq, and, desc } from "drizzle-orm";
 import { albums } from "@/db/schema";
 import { auth } from "@/server/auth";
-import Link from "next/link";
-import { Library } from "lucide-react";
+import { Library} from "lucide-react";
+import CreateAlbumButton from "@/components/albums/CreateAlbumButton";
+import AlbumCard from "@/components/albums/AlbumCard";
 
 export default async function AlbumsPage() {
     const session  = await auth();
@@ -16,12 +17,14 @@ export default async function AlbumsPage() {
 
     return (
         <div className="p-8">
-            <header className="mb-10">
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                    <Library className="text-orange-500 w-5 h-5"/>
-                    Albums
-                </h1>
-                <p className="text-neutral-500 text-sm mt-2">Your Collections</p>
+            <header className="mb-10 flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <Library className="text-orange-500 w-5 h-5"/> Albums
+                    </h1>
+                    <p className="text-neutral-500 text-sm mt-2">Your Collections</p>
+                </div>
+                <CreateAlbumButton />
             </header>
 
             {userAlbums.length === 0 ? (
@@ -33,22 +36,7 @@ export default async function AlbumsPage() {
             ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
                     {userAlbums.map((album) => (
-                        <Link href={`/albums/${album.id}`} key={album.id} className="group">
-                            <div className="aspect-square bg-neutral-900 rounded-2xl overflow-hidden mb-4 relative border border-neutral-800 shadow-lg group-hover:border-orange-500/50 transition-all">
-                                {album.coverMediaId ? (
-                                    <img src={`/api/media/${album.coverMediaId}?size=medium`} alt={album.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-neutral-700">
-                                        <Library size={40} />
-                                    </div>
-                                )}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                            </div>
-                            <h3 className="text-sm font-bold text-neutral-200 group-hover:text-orange-500 transition-colors truncate">
-                                {album.name}
-                            </h3>
-                            <p className="text-xs text-neutral-500 mt-1 uppercase tracking-widest">Album</p>
-                        </Link>
+                        <AlbumCard key={album.id} album={album} />
                     ))}
                 </div>
             )}

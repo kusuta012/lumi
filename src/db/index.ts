@@ -3,5 +3,14 @@ import postgres from "postgres";
 import * as schema from "./schema";
 import { env } from '@/lib/env'
 
-const client = postgres(env.DATABASE_URL, { prepare: false });
-export const db = drizzle(client, { schema });
+const globalForDb = globalThis as unknown as {
+    conn: postgres.Sql | undefined;
+};
+
+const conn = globalForDb.conn ?? postgres(env.DATABASE_URL, { prepare: false });
+
+if (process.env.NODE_ENV !== 'production') {
+    globalForDb.conn = conn;
+}
+
+export const db = drizzle(conn, { schema });

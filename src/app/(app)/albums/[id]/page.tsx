@@ -4,6 +4,8 @@ import { eq, and, desc, inArray } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import TimelineGallery from "@/components/media/TimelineGallery";
 import { notFound } from "next/navigation";
+import { renameAlbumAction, deleteAlbumAction } from "@/server/actions/album-actions";
+import AlbumHeadersAction from "@/components/albums/AlbumHeadersActions";
 
 export default async function AlbumDetailPage({ params }: { params: Promise<{ id: string}> }) {
     const session = await auth();
@@ -33,12 +35,16 @@ export default async function AlbumDetailPage({ params }: { params: Promise<{ id
 
     return (
         <div>
-            <div className="px-8 py-10 border-b border-neutral-900">
-                <h1 className="text-3xl font-bold text-white">{album.name}</h1>
-                <p className="text-neutral-500 text-sm mt-1">{albumPhotos.length} items</p>
+            <div className="px-8 py-10 border-b border-neutral-900 flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">{album.name}</h1>
+                    <p className="text-neutral-500 text-sm mt-1">{albumPhotos.length} items</p>
+                </div>
+                <AlbumHeadersAction album={album} />
             </div>
+            
 
-            <TimelineGallery initialMedia={albumPhotos as any} startYear={startYear} endYear={endYear} emptyMessage="The album is empty" />
+            <TimelineGallery initialMedia={albumPhotos as any} startYear={startYear} endYear={endYear} emptyMessage="The album is empty" albumId={album.id} />
         </div>
     )
 
