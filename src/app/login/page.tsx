@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { loginAction, type LoginState } from "@/server/actions/auth-actions"
+import { loginAction, type LoginState } from "@/server/actions/auth-actions";
+import Link from "next/link"
 
 export default function LoginPage() {
     const [state, formAction, isPending] = useActionState<LoginState, FormData>(loginAction, null);
@@ -31,8 +32,13 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    <button type="submit" disabled={isPending} className="w-full bg-orange-600 hover:bg-white-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-lg transition-colors mt-4">{isPending ? "Signing in...": "Sign in"}</button>
+                    <button type="submit" disabled={isPending} className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-lg transition-colors mt-4">{isPending ? "Signing in...": "Sign in"}</button>
                 </form>
+
+                <div className="mt-6 text-center text-sm text-neutral-500 font-medium">
+                    Don't Have an account?{" "}
+                    <Link href="/register" className="text-orange-500 hover:underline transition-all">Sign Up</Link>
+                </div>
             </div>
         </div>
     )
