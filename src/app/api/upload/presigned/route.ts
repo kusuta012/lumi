@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from '@/server/auth';
-import { minioClient, BUCKET_NAME } from "@/lib/storage";
+import { getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, storageBackends } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
@@ -29,16 +29,23 @@ export async function POST(req: Request) {
             }, {status: 403 });
         }
 
-        const bucketExists = await minioClient.bucketExists(BUCKET_NAME);
-        if (!bucketExists) await minioClient.makeBucket(BUCKET_NAME);
+        const defaultBackend = await db.query.storageBackends.findFirst({ 
+            where: eq(storageBackends.isDefault, true) 
+        });
+
+        const { client, bucket } = getStorageClient(defaultBackend?.config);
+
+        const bucketExists = await client.bucketExists(bucket);
+        if (!bucketExists) await client.makeBucket(bucket);
 
         const fileId = crypto.randomUUID();
-        const objectKey = `users/${session.user.id}/${fileId}-${filename}`;
-        const presignedUrl = await minioClient.presignedPutObject(BUCKET_NAME, objectKey, 3600);
+        const ext = filename.split(`.`).pop();
+        const objectKey = `users/${session.user.id}/${fileId}-${ext}}`;
+        const presignedUrl = await client.presignedPutObject(bucket, objectKey, 3600);
 
-        return NextResponse.json({ presignedUrl, objectKey })
+        return NextResponse.json({ presignedUrl, objectKey, backendId: defaultBackend?.id || null });
     } catch (err) {
         console.error("presigned url error", err)
-        return NextResponse.json({ error: 'Internal Server Error'}, { status: 500 });
+        return NextResponse.json({ error: 'failed to generate presigned url'}, { status: 500 });
     }
 }

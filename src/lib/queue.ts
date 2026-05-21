@@ -13,3 +13,7 @@ export const mediaQueue = new Queue('media-processing', {
         backoff: { type: 'exponential', delay: 1000 },
     }
 });
+
+export const migrationQueue = new Queue('storage-migration', {
+    connection, defaultJobOptions: { attempts: 1 }
+})

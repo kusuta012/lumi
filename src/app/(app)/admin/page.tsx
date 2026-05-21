@@ -6,6 +6,8 @@ import RegistrationToggle from "@/components/admin/RegistrationToggle";
 import { getRegistrationSetting } from "@/server/actions/config-actions";
 import Link from "next/link";
 import os from "os";
+import { getMaintenanceSetting } from "@/server/actions/storage-actions";
+import MaintenanceToggle from "@/components/admin/MaintenanceToggle";
 
 async function checkDatabase() {
     try {
@@ -38,6 +40,7 @@ function getRamUsage() {
 
 export default async function AdminPage() {
     const allowReg = await getRegistrationSetting();
+    const isMaintenance = await getMaintenanceSetting();
     const ram = getRamUsage();
 
     const [userCountResult] = await db.select({ value: count() }).from(users);
@@ -103,6 +106,7 @@ export default async function AdminPage() {
                         </h2>
                         <div className="space-y-4">
                             <RegistrationToggle isEnabled={allowReg} />
+                            <MaintenanceToggle isEnabled={isMaintenance} />
                             <div className="flex items-center justify-between p-3 opacity-50">
                                 <div>
                                     <span className="text-white font-bold text-sm block">Maintenance Mode</span>
@@ -118,7 +122,7 @@ export default async function AdminPage() {
                 <Link href="/admin/users" className="border border-neutral-700 p-3 text-center text-sm font-bold text-neutral-300 hover:border-orange-500 hover:text-orange-500 transition-none bg-[#0a0a0a]">
                     USER MANAGEMENT
                 </Link>
-                <Link href="/admin/users" className="border border-neutral-700 p-3 text-center text-sm font-bold text-neutral-300 hover:border-orange-500 hover:text-orange-500 transition-none bg-[#0a0a0a]">
+                <Link href="/admin/storage" className="border border-neutral-700 p-3 text-center text-sm font-bold text-neutral-300 hover:border-orange-500 hover:text-orange-500 transition-none bg-[#0a0a0a]">
                     STORAGE CONFIG
                 </Link>
                 <Link href="/admin/users" className="border border-neutral-700 p-3 text-center text-sm font-bold text-neutral-300 hover:border-orange-500 hover:text-orange-500 transition-none bg-[#0a0a0a]">

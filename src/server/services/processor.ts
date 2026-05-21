@@ -1,9 +1,10 @@
 import sharp from "sharp";
+import "dotenv/config";
 import { execa } from "execa";
 import ffmpegPath from "ffmpeg-static";
 import { path as ffprobePath } from "ffprobe-static";
 import exifReader from "exif-reader";
-import { minioClient, BUCKET_NAME } from "@/lib/storage";
+import { getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
 import { media } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -12,14 +13,21 @@ import path from "path";
 import os from "os";
 
 export async function processMediaItem(mediaId: string) {
-  const item = await db.query.media.findFirst({ where: eq(media.id, mediaId) });
+  const item = await db.query.media.findFirst({
+    where: eq(media.id, mediaId),
+    with: { storageBackend: true }
+  })
+  
   if (!item || !ffmpegPath) return;
+  const { client, bucket } = getStorageClient(item?.storageBackend?.config);
+
+  
 
   const isVideo = item.mimetype.startsWith("video/");
   const tempInput = path.join(os.tmpdir(), `lumi-input-${item.id}`);
 
   try {
-    await minioClient.fGetObject(BUCKET_NAME, item.objectKey, tempInput);
+    await client.fGetObject(bucket, item.objectKey, tempInput);
 
     let width = 0;
     let height = 0;
@@ -64,6 +72,7 @@ export async function processMediaItem(mediaId: string) {
           tempInput,
           "-vframes",
           "1",
+          "-an",
           "-f",
           "image2",
           "-c:v",
@@ -115,8 +124,8 @@ export async function processMediaItem(mediaId: string) {
         .toBuffer();
 
       const thumbKey = `thumbs/${item.ownerId}/${item.id}-${name}.webp`;
-      await minioClient.putObject(
-        BUCKET_NAME,
+      await client.putObject(
+        bucket,
         thumbKey,
         thumbBuffer,
         thumbBuffer.length,

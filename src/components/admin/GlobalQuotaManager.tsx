@@ -29,7 +29,7 @@ export default function GlobalQuotaManger() {
             </div>
             <div className="flex items-center gap-2 w-full md:w-auto">
                 <div className="relative flex-1 md:w-32">
-                    <input type="number" value={val} onChange={(e) => setVal(Number(e.target.value))} className="w-full bg-black border border-neutral-700 px-3 py-1.5 text-sm text-white font-mono focus:border-orange-500 outline-none" />
+                    <input type="number" value={val} onChange={(e) => { const inputVal = Number(e.target.value); setVal(inputVal < 1 ? 1 : inputVal ); }} className="w-full bg-black border border-neutral-700 px-3 py-1.5 text-sm text-white font-mono focus:border-orange-500 outline-none" />
                     <span className="absolute right-3 top-1.5 text-[10px] text-neutral-500 font-bold">GB</span>
                 </div>
                 <button onClick={handleBulkUpdate} disabled={isPending} className="px-4 py-1.5 bg-orange-600 text-black text-[10px] font-black hover:bg-orange-500 transition-none disabled:opacity-50">

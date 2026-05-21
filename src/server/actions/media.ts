@@ -12,6 +12,7 @@ export async function recordMediaUpload(data: {
     mimetype: string;
     size: number;
     objectKey: string;
+    storageBackendId: string | null;
 }) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
@@ -25,6 +26,7 @@ export async function recordMediaUpload(data: {
                     mimetype: data.mimetype,
                     size: data.size,
                     objectKey: data.objectKey,
+                    storageBackendId: data.storageBackendId,
                     hash: "pending",
             }).returning();
 

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/db";
 import { media } from "@/db/schema"
-import { eq } from "drizzle-orm";
-import { minioClient, BUCKET_NAME } from "@/lib/storage";
+import { eq, and } from "drizzle-orm";
+import { getStorageClient } from "@/lib/storage";
 
 export async function GET(
     req: NextRequest, 
@@ -16,8 +16,10 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const size = searchParams.get("size") || "original";
     const item = await db.query.media.findFirst({
-        where: eq(media.id, id),
+        where: and(eq(media.id, id), eq(media.ownerId, session.user.id)),
+        with: { storageBackend: true }
     });
+    const { client, bucket } = getStorageClient(item?.storageBackend?.config);
 
     if (!item) return new NextResponse("Not found", { status: 404 })
     if (item.ownerId !== session.user.id) {
@@ -35,12 +37,12 @@ export async function GET(
 
         const range = req.headers.get("range");
         if (item.mimetype.startsWith("video/") && range && size === "original") {
-            const stat = await minioClient.statObject(BUCKET_NAME, objectKey);
+            const stat = await client.statObject(bucket, objectKey);
             const parts = range.replace(/bytes=/, "").split("-");
             const start  = parseInt(parts[0], 10);
             const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
 
-            const stream = await minioClient.getPartialObject(BUCKET_NAME, objectKey, start, end - start + 1);
+            const stream = await client.getPartialObject(bucket, objectKey, start, end - start + 1);
             return new NextResponse(stream as any, {
                 status: 206,
                 headers: {
@@ -52,7 +54,7 @@ export async function GET(
             });
         }
 
-        const dataStream = await minioClient.getObject(BUCKET_NAME, objectKey);
+        const dataStream = await client.getObject(bucket, objectKey);
         return new NextResponse(dataStream as any, {
             headers: {
                 "Content-Type": size === "original" ? item.mimetype : "image/webp",

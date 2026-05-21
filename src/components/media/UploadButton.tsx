@@ -30,7 +30,7 @@ export default function UploadButton() {
                     throw new Error(errData.message || `Failed to get upload URL for ${file.name}`);
                 }
 
-                const { presignedUrl, objectKey } = await res.json();
+                const { presignedUrl, objectKey, backendId } = await res.json();
                 const uploadRes = await fetch(presignedUrl, {
                     method: "PUT",
                     body: file,
@@ -46,6 +46,7 @@ export default function UploadButton() {
                     mimetype: file.type,
                     size: file.size,
                     objectKey: objectKey,
+                    storageBackendId: backendId
                 });
             }
 

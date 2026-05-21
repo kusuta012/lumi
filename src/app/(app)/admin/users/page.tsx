@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import UserManagementTable from "@/components/admin/UserManagementTable";
 import { GlobalLayoutRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import GlobalQuotaManger from "../GlobalQuotaManager";
+import GlobalQuotaManger from "../../../../components/admin/GlobalQuotaManager";
 
 export default async function AdminUsersPage() {
     const session = await auth();

@@ -10,7 +10,12 @@ export default function UserManagementTable({ users }: { users: any[] }) {
     const handleEditUserQuota = (userId: string, currentGB: number) => {
         const newGb = prompt("Enter new storage limit (GB):", currentGB.toString());
         if (newGb && !isNaN(Number(newGb))) {
-            startTransition(async () => { await updateUserQuotaAction(userId, Number(newGb) * 1024)
+            const gbNum = Number(newGb);
+            if (gbNum < 1) {
+                alert("Quota must br at least 1 GB");
+                return;
+            }
+            startTransition(async () => { await updateUserQuotaAction(userId, gbNum * 1024)
         });
         }
     };
