@@ -10,7 +10,10 @@ export async function POST(req: Request) {
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401});
 
     try {
-        const { filename, fileSize } = await req.json();
+        const { filename, fileSize, contentType } = await req.json();
+        if (!contentType?.startsWith("image/") && !contentType?.startsWith("video/")) {
+            return NextResponse.json({ error: "invalid file type. Only images and video are allowed."}, { status: 400 });
+        }
         const user = await db.query.users.findFirst({
             where: eq(users.id, session.user.id),
             columns: { storageUsed: true, storageQuota: true }

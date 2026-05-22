@@ -1,0 +1,167 @@
+"use server";
+
+import { db } from "@/db";
+import { shareLinks, albums, albumMedia, users, media, albumContributors } from "@/db/schema";
+import { auth } from "@/server/auth";
+import { revalidatePath } from "next/cache";
+import { nanoid } from "nanoid";
+import { mediaQueue } from "@/lib/queue";
+import { eq, sql, and } from "drizzle-orm";
+
+export async function createShareLink(data: {
+    targetType: 'media' | 'album';
+    targetId: string;
+    allowDownload: boolean;
+    allowUpload: boolean;
+    requireLogin: boolean;
+    expiresInDays?: number;
+}) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const token = nanoid(10);
+    let expiresAt = null;
+    if (data.expiresInDays) {
+        expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + data.expiresInDays);
+    }
+
+    try {
+        const [link] = await db.insert(shareLinks).values({
+            ownerId: session.user.id,
+            targetType: data.targetType,
+            targetId: data.targetId,
+            linkToken: token,
+            allowDownload: data.allowDownload,
+            allowUpload: data.allowUpload,
+            requireLogin: data.requireLogin,
+            expiresAt: expiresAt,
+        }).returning();
+
+        revalidatePath("/sharing");
+        return { success: true, token: link.linkToken };
+    } catch (err) {
+        console.error("failed to create share link", err);
+        return { success: false, error: "failed to generate share link"};
+    }
+}
+
+export async function shareBulkMedia(mediaIds: string[], albumName: string, allowDownload: boolean, allowUpload: boolean, requireLogin: boolean, expiresInDays?: number) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error ("Unauthorized");
+    if (!mediaIds || mediaIds.length === 0) throw new Error("No media selected");
+
+    const token = nanoid(10);
+    let expiresAt = null;
+    if (expiresInDays) {
+        expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+    }
+
+    try {
+        let targetId = mediaIds[0];
+        let targetType: 'media' | 'album' = 'media';
+
+        if (mediaIds.length > 1) {
+            const [sharedAlbum] = await db.insert(albums).values({
+                name: albumName || "Shared Collection",
+                ownerId: session.user.id,
+                coverMediaId: mediaIds[0]
+            }).returning();
+
+            const entries = mediaIds.map(id => ({ albumId: sharedAlbum.id, mediaId: id }));
+            await db.insert(albumMedia).values(entries);
+
+            targetId = sharedAlbum.id;
+            targetType = 'album';
+        }
+
+        const [link] = await db.insert(shareLinks).values({
+            ownerId: session.user.id,
+            targetType, 
+            targetId,
+            linkToken: token,
+            allowDownload,
+            allowUpload,
+            requireLogin,
+            expiresAt,
+        }).returning();
+
+        revalidatePath("/sharing");
+        return { success: true, token: link.linkToken };
+    } catch (err) {
+        console.error("bulk share failed", err);
+        return { success: false, error: "Failed to generate share link"};
+    }
+}
+
+export async function publicUploadToSharedAlbum(token: string, data: {
+    filename: string;
+    mimetype: string;
+    size: number;
+    objectKey: string;
+}) {
+    const link = await db.query.shareLinks.findFirst({ where: eq(shareLinks.linkToken, token) });
+    if (!link || link.targetType !== 'album') throw new Error("Unauthorized");
+    if (link.expiresAt && new Date(link.expiresAt) < new Date()) throw new Error("Link expired");
+
+    const sizeInMB = data.size > 0 ? Math.max(1, Math.round(data.size / (1024 * 1024))) : 0;
+
+    try {
+        await db.transaction(async (tx) => {
+            const [newMedia] = await tx.insert(media).values({
+                ownerId: link.ownerId,
+                filename: data.filename,
+                mimetype: data.mimetype,
+                size: data.size,
+                objectKey: data.objectKey,
+                hash: "pending",
+            }).returning();
+
+            await tx.insert(albumMedia).values({
+                albumId: link.targetId,
+                mediaId: newMedia.id,
+            });
+
+            await tx.update(users)
+                .set({ storageUsed: sql`${users.storageUsed} + ${sizeInMB}` })
+                .where(eq(users.id, link.ownerId));
+            await mediaQueue.add('process', { mediaId: newMedia.id });
+        });
+
+        revalidatePath(`s/${token}`);
+        return { sucess: true };
+    } catch (err) {
+        console.error("public upload db save failed", err);
+        return { success: false, error: "Failed to save upload to album"}
+    }
+}
+
+export async function updateAlbumContributors(albumId: string, userIds: string[]) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    await db.transaction(async (tx) => {
+        await tx.delete(albumContributors).where(eq(albumContributors.albumId, albumId));
+        if (userIds.length > 0) {
+            const entries = userIds.map(uid => ({ albumId, userId: uid }));
+            await tx.insert(albumContributors).values(entries);
+        }
+    });
+    return { success: true };
+}
+
+export async function deleteShareLink(linkId: string) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        await db.delete(shareLinks)
+            .where(and(eq(shareLinks.id, linkId), eq(shareLinks.ownerId, session.user.id)));
+        revalidatePath("/sharing/shared-links");
+        return { sucess: true };
+    } catch (err) {
+        console.error("failed to delete share link", err);
+        return { success: false, error: "failed to delete share lnik" };
+    }
+}

@@ -1,11 +1,14 @@
 "use client";
 
-import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Trash2, Info, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon } from "lucide-react";
+import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon } from "lucide-react";
 import { format } from "date-fns";
 import { useTransition, useState, useEffect } from "react";
 import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction } from "@/server/actions/media-mutations";
 import { updateAlbumAction } from "@/server/actions/album-actions";
+import { moveToLockedFolder } from "@/server/actions/locked-actions";
+import { restoreFromLockedFolder } from "@/server/actions/locked-actions";
 import { useRouter } from "next/navigation";
+import ShareModal from "./ShareModal";
 
 interface LightboxProps {
     items: any[];
@@ -13,15 +16,18 @@ interface LightboxProps {
     setIndex: (i: number) => void;
     onClose: () => void;
     albumId?: string;
+    isOwner?: boolean;
+    allowDownload?: boolean;
 }
 
-export default function Lightbox({ items, index, setIndex, onClose, albumId }: LightboxProps) {
+export default function Lightbox({ items, index, setIndex, onClose, albumId, isOwner = true, allowDownload = true }: LightboxProps) {
     const item = items[index];
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showInfo, setShowInfo] = useState(false);
     const [isFav, setIsFav] = useState(item?.isFavorited ?? false);
     const [isArchived, setIsArchived] = useState(item?.isArchived ?? false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     useEffect(() => {
         if (!item) {
@@ -110,6 +116,26 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId }: L
             });
         }
     };
+
+    const handleLock = () => {
+        const confirmed = confirm("Move this item to the locked folder? It will be remove from all albums");
+        if (!confirmed) return;
+
+        startTransition(async () => {
+            await moveToLockedFolder([item.id]);
+            onClose();
+            router.refresh();
+        });
+    };
+
+    const handleUnlock = () => {
+        startTransition(async () => {
+            await restoreFromLockedFolder([item.id]);
+            onClose();
+            router.refresh();
+        });
+    };
+
     if (!item) return null;
     return (
         <div className="fixed inset-0 z-[100] bg-black flex overflow-hidden animate-in fade-in duration-200">
@@ -123,30 +149,44 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId }: L
                         
                         <IconButton icon={<Maximize2 size={20} />} onClick={() => document.documentElement.requestFullscreen()} />
                         <IconButton icon={<Copy size={20} />} onClick={handleCopy} />
-                        <IconButton icon={<Download size={20} />} onClick={handleDownload} />
+                        {allowDownload && (
+                            <IconButton icon={<Download size={20} />} onClick={handleDownload} />
+                        )}
                         <IconButton icon={<Info size={20} />} onClick={() => setShowInfo(!showInfo)} active={showInfo} />
-                        {albumId && !item.isDeleted && (
+                        {isOwner && !item.isDeleted && (
+                            <IconButton icon={<Share2 size={20} />} onClick={() => setIsShareModalOpen(true)} />
+                        )}
+                        {isOwner && (
+                            <>
+                            {albumId && !item.isDeleted && (
                             <IconButton icon={<ImageIcon size={20} />}
                             onClick={handleSetCover}
                             disabled={isPending}
                             title="Set as Album Cover"
                             />
                         )}
-                        
-                        {item.isDeleted ? (
+                        {item.isLocked && !item.isDeleted && (
+                            <IconButton icon={<Unlock size={20} />} onClick={handleUnlock} disabled={isPending} />
+                        )}
+
+                        {!item.isDeleted ? (
+                            <>
+                            <IconButton icon={<Heart size={20} className={isFav ? "fill-red-500 text-red-500" : ""} />} onClick={() => handleAction('fav')} disabled={isPending} />
+                                <IconButton icon={<Archive size={20} className={isArchived ? "fill-blue-500 text-blue-500" : ""} />} onClick={() => handleAction('archive')} disabled={isPending} />
+                                {/* <IconButton icon={<SlidersHorizontal size={20} />} onClick={() => { }} /> */}
+                                {!item.isLocked && (
+                                    <IconButton icon={<Lock size={20} />} onClick={handleLock} disabled={isPending} />
+                                )}
+                                <IconButton icon={<Trash2 size={20} />} onClick={() => handleAction('trash')} disabled={isPending} className="text-red-400 hover:text-red-500" />
+                                {/* <IconButton icon={<MoreVertical size={20} />} onClick={() => { }} /> */}
+                            </>
+                        ) : (
                             <>
                                 <IconButton icon={<RefreshCcw size={20} />} onClick={handleRestore} disabled={isPending} className="text-emerald-400" />
                                 <IconButton icon={<Trash2 size={20} />} onClick={handlePermanentDelete} disabled={isPending} className="text-red-500" />
                             </>
-                        ) : (
-                            <>
-                                {/* <IconButton icon={<Share2 size={20} />} onClick={() => { }} /> */}
-                                <IconButton icon={<Heart size={20} className={isFav ? "fill-red-500 text-red-500" : ""} />} onClick={() => handleAction('fav')} disabled={isPending} />
-                                <IconButton icon={<Archive size={20} className={isArchived ? "fill-blue-500 text-blue-500" : ""} />} onClick={() => handleAction('archive')} disabled={isPending} />
-                                {/* <IconButton icon={<SlidersHorizontal size={20} />} onClick={() => { }} /> */}
-                                <IconButton icon={<Trash2 size={20} />} onClick={() => handleAction('trash')} disabled={isPending} className="text-red-400 hover:text-red-500" />
-                                {/* <IconButton icon={<MoreVertical size={20} />} onClick={() => { }} /> */}
-                            </>
+                        )}
+                    </>
                         )}
                     </div>
                 </div>
@@ -194,6 +234,9 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId }: L
                         <DetailSection icon={<FileText className="w-5 h-5" />} label="File Details" value={item.filename} sub={`${(item.size / 1024 / 1024).toFixed(2)} MB • ${item.width} x ${item.height}`} />
                     </div>
                 </div>
+            )}
+            {isShareModalOpen && (
+                <ShareModal targetId={item.id} type="media" onClose={() => setIsShareModalOpen(false)} />
             )}
         </div>
     );

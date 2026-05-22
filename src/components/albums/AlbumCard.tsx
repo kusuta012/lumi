@@ -6,11 +6,13 @@ import { MoreVertical, Edit2, Share2, Download, Trash2, Library, Trash } from "l
 import { deleteAlbumAction } from "@/server/actions/album-actions";
 import EditAlbumModal from "./EditAlbumModal";
 import { useRouter } from "next/navigation";
+import ShareModal from "../media/ShareModal";
 
 export default function AlbumCard({ album }: { album: any }) {
     const router = useRouter();
     const [menuOpen, setMenuOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +78,7 @@ export default function AlbumCard({ album }: { album: any }) {
                         <button onClick={(e) => { e.stopPropagation(); setIsEditModalOpen(true); setMenuOpen(false); }} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors">
                             <Edit2 size={16} /> Edit Album
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); setIsShareModalOpen(true); setMenuOpen(false); }} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors">
                             <Share2 size={16} /> Share
                         </button>
                         <button onClick={handleDownload} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors">
@@ -91,6 +93,9 @@ export default function AlbumCard({ album }: { album: any }) {
             </div>
             {isEditModalOpen && (
                 <EditAlbumModal album={album} onClose={() => setIsEditModalOpen(false)} />
+            )}
+            {isShareModalOpen && (
+                <ShareModal targetId={album.id} type="album" onClose={() => setIsShareModalOpen(false)} />
             )}
         </>
     );

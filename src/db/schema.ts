@@ -14,6 +14,7 @@ export const users = pgTable('users', {
     storageQuota: integer('storage_quota'),
     storageUsed: integer('storage_used').default(0),
     isSuspended: boolean('is_suspended').default(false),
+    lockedFolderPin: text('locked_folder_pin'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     UpdatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -87,6 +88,7 @@ export const media = pgTable('media', {
     isFavorited: boolean('is_favorited').default(false),
     isDeleted: boolean('is_deleted').default(false),
     isEncrypted: boolean('is_encrypted').default(true),
+    isLocked: boolean('is_locked').default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
 }, (table) => [index('media_owner_idx').on(table.ownerId), index('media_date_taken_idx').on(table.dateTaken)]);
@@ -133,6 +135,8 @@ export const shareLinks = pgTable('share_links', {
     isPublic: boolean('is_public').default(true),
     passwordHash: text('password_hash'),
     allowDownload: boolean('allow_download').default(true),
+    allowUpload: boolean('allow_upload').default(false),
+    requireLogin: boolean('require_login').default(false),
     viewCount: integer('view_count').default(0),
     expiresAt: timestamp('expires_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),

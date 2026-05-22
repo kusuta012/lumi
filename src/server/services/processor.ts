@@ -4,10 +4,10 @@ import { execa } from "execa";
 import ffmpegPath from "ffmpeg-static";
 import { path as ffprobePath } from "ffprobe-static";
 import exifReader from "exif-reader";
-import { getStorageClient } from "@/lib/storage";
+import { BUCKET_NAME, getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
-import { media } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { media, users } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -85,34 +85,43 @@ export async function processMediaItem(mediaId: string) {
       thumbnailBuffer = frameBuffer as unknown as Buffer;
     } else {
       const imageBuffer = await fs.readFile(tempInput);
-      const pipeline = sharp(imageBuffer);
-      const metadata = await pipeline.metadata();
-      width = metadata.width || 0;
-      height = metadata.height || 0;
-      thumbnailBuffer = imageBuffer
+      try {
+            const pipeline = sharp(imageBuffer);
+            const metadata = await pipeline.metadata();
+            width = metadata.width || 0;
+            height = metadata.height || 0;
+            thumbnailBuffer = imageBuffer
 
-      if (metadata.exif) {
-        try {
-          const exif = exifReader(metadata.exif);
-          if (exif.Photo?.DateTimeOriginal instanceof Date) {
-            dateTaken = exif.Photo.DateTimeOriginal;
+            if (metadata.exif) {
+                try {
+                    const exif = exifReader(metadata.exif) as any;
+                    if (exif.Photo?.DateTimeOriginal instanceof Date) {
+                    dateTaken = exif.Photo.DateTimeOriginal;
+                    }
+                    if (exif.Image?.Model) {
+                    cameraModel = String(exif.Image.Model);
+                    }
+                    if (exif.GPS?.Latitude !== undefined) {
+                    const lat = Number(exif.GPS.Latitude);
+                    if (!isNaN(lat)) gpsLat = lat;
+                    }
+                    if (exif.GPS?.Longitude !== undefined) {
+                    const lng = Number(exif.GPS.Longitude);
+                    if (!isNaN(lng)) gpsLng = lng;
+                    }
+                } catch (e) { console.warn("could not parse exif for", item.filename); }
+              }
+            } catch (e) {
+              console.error(`invalid imdage data for ${item.filename}`);
+              const sizeInMB = item.size > 0 ? Math.max(1, Math.round(item.size / (1024 * 1024))) :0;
+              await db.update(users)
+                .set({ storageUsed: sql`GREATEST(0, ${users.storageUsed} - ${sizeInMB})` })
+                .where(eq(users.id, item.ownerId));
+              await db.delete(media).where(eq(media.id, item.id));
+              await client.removeObject(BUCKET_NAME, item.objectKey);
+              return;
+            }
           }
-          if (exif.Image?.Model) {
-            cameraModel = String(exif.Image.Model);
-          }
-          if (exif.GPSInfo?.Latitude !== undefined) {
-            const lat = Number(exif.GPSInfo.Latitude);
-            if (!isNaN(lat)) gpsLat = lat;
-          }
-          if (exif.GPSInfo?.Longitude !== undefined) {
-            const lng = Number(exif.GPSInfo.Longitude);
-            if (!isNaN(lng)) gpsLng = lng;
-          }
-        } catch (e) {
-          console.warn("could not parse exif for", item.filename);
-        }
-      }
-    }
 
     const sizes = { small: 300, medium: 720, large: 1440 };
     const thumbnails: Record<string, string> = {};

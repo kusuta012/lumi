@@ -15,8 +15,14 @@ export default function UploadButton() {
         setLoading(true);
         const totalFiles = files.length;
         try {
+            let successCount = 0;
+            let skippedCount = 0;
             for (let i = 0; i < totalFiles; i++) {
                 const file = files[i];
+                if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+                    console.warn(`file ${file.name} is not a valid media item`)
+                    continue;
+                }
                 setProgress(`Uploading ${i + 1}/${totalFiles}....`);
 
                 const res = await fetch("/api/upload/presigned", {
@@ -48,9 +54,11 @@ export default function UploadButton() {
                     objectKey: objectKey,
                     storageBackendId: backendId
                 });
+                successCount++;
             }
 
-            alert("Upload complete");
+            if (successCount > 0) alert(`successfully uploaded ${successCount} files`);
+            if (skippedCount > 0) alert(`${skippedCount} files were skipped (unsupported format)`);
         } catch (err: any) {
             console.error("batch upload failed", err);
             alert(`Upload failed ${err.message || "unknown erorr"}`);

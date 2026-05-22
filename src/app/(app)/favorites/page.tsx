@@ -10,7 +10,7 @@ export default async function FavoritesPage() {
     if (!session?.user?.id) return null;
 
     const items = await db.query.media.findMany({
-        where: and(eq(media.ownerId, session.user.id), eq(media.isDeleted, false), eq(media.isFavorited, true)),
+        where: and(eq(media.ownerId, session.user.id), eq(media.isDeleted, false), eq(media.isFavorited, true), eq(media.isLocked, false)),
         orderBy: [desc(media.dateTaken), desc(media.createdAt)],
     });
 

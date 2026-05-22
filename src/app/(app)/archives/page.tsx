@@ -10,7 +10,7 @@ export default async function ArchivePage() {
     if (!session?.user?.id) return null;
 
     const items = await db.query.media.findMany({
-        where: and(eq(media.ownerId, session.user.id), eq(media.isDeleted, false), eq(media.isArchived, true)),
+        where: and(eq(media.ownerId, session.user.id), eq(media.isDeleted, false), eq(media.isArchived, true), eq(media.isLocked, false)),
         orderBy: [desc(media.dateTaken), desc(media.createdAt)],
     });
 

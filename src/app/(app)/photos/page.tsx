@@ -12,7 +12,8 @@ export default async function PhotosPage() {
         where: and(
             eq(media.ownerId, session.user.id),
             eq(media.isDeleted, false),
-            eq(media.isArchived, false)
+            eq(media.isArchived, false),
+            eq(media.isLocked, false)
         ),
         orderBy: [desc(media.dateTaken), desc(media.createdAt)],
     });

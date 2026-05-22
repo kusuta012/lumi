@@ -5,16 +5,17 @@ import Lightbox from "./Lightbox";
 import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw } from "lucide-react";
 import AddToAlbumModal from "./AddToAlbumModal";
 import { restoreMediaAction, deletePermanentlyAction, bulkMoveToTrashAction } from "@/server/actions/media-mutations";
-import { clear } from "console";
+import shareModal from './ShareModal';
+import ShareModal from "./ShareModal";
 
 interface MediaItem {
     id: string,
     filename: string;
     dateTaken: Date | null;
     createdAt: Date;
-    isFavorited: boolean;
-    isArchived: boolean;
-    isDeleted: boolean;
+    isFavorited: boolean | null;
+    isArchived: boolean | null;
+    isDeleted: boolean | null;
     mimetype: string;
     size: number;
     width: number | null;
@@ -28,13 +29,17 @@ interface Props {
     emptyMessage?: string;
     isTrashPage?: boolean;
     albumId?: string;
+    isOwner?: boolean;
+    allowDownload?: boolean;
+    isLockedPage?: boolean;
 
 }
 
-export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false, albumId }: Props) {
+export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [showAlbumModal, setShowAlbumModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
     const isSelectionMode = selectedIds.length > 0;
 
     const groupedMedia = initialMedia.reduce<Record<string, MediaItem[]>>((acc, item) => {
@@ -109,7 +114,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                             <button onClick={() => setShowAlbumModal(true)} className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-orange-500 transition-colors">
                             <Plus size={18} />
                         </button>
-                        <button className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors">
+                        <button onClick={() => setShowShareModal(true)} className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors">
                             <Share2 size={18} />
                         </button>
                         <button onClick={handleBulkTrash} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors">
@@ -161,11 +166,14 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                 <span>{endYear}</span>
             </div>
             {selectedIndex !== null && (
-                <Lightbox items={initialMedia} index={selectedIndex} setIndex={(i: number) => setSelectedIndex(i)} onClose={() => setSelectedIndex(null)} albumId={albumId} />
+                <Lightbox items={initialMedia} index={selectedIndex} setIndex={(i: number) => setSelectedIndex(i)} onClose={() => setSelectedIndex(null)} albumId={albumId} isOwner={isOwner} allowDownload={allowDownload} />
             )}
 
             {showAlbumModal && (
                 <AddToAlbumModal selectedIds={selectedIds} onClose={() => setShowAlbumModal(false)} onSuccess={() => { clearSelection(); }} />
+            )}
+            {showShareModal && (
+                <ShareModal selectedIds={selectedIds} type="media" onClose={() => setShowShareModal(false)} onSuccess={() => { clearSelection(); }} />
             )}
         </div>
     );
