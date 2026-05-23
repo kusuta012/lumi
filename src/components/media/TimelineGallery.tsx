@@ -93,7 +93,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     return(
         <div className="p-6 pb-24 relative">
             {isSelectionMode && (
-                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-6 px-6 py-3 bg-neutral-900 border border-neutral-800 rounded-full shadow-2xl animate-in slide-in-from-top duration-300">
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] flex items-center gap-6 px-6 py-3 bg-neutral-900 border border-neutral-800 rounded-full shadow-2xl animate-in slide-in-from-top duration-300">
                     <div className="flex items-center gap-3 pr-4 border-r border-neutral-800">
                         <button onClick={clearSelection} className="p-1 hover:bg-neutral-800 rounded-full transition-colors">
                             <X size={18} className="text-neutral-400" />

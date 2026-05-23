@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { albumMedia, media, albums, users } from "@/db/schema";
-import { eq, and, inArray, notInArray, sql } from "drizzle-orm";
+import { eq, and, inArray, notInArray, sql, count } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { BUCKET_NAME, minioClient } from "@/lib/storage";
@@ -141,6 +141,15 @@ export async function deletePermanentlyAction(mediaIds: string[]) {
 
     for (const item of items) {
       try {
+
+        const [remaining] = await db.select({ value: count() })
+            .from(media)
+            .where(eq(media.hash, item.hash));
+        
+        if (remaining.value > 0) {
+            continue;
+        }
+
         await minioClient.removeObject(BUCKET_NAME, item.objectKey);
         if (item.thumbnails) {
           const thumbs = item.thumbnails as Record<string, string>;

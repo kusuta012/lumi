@@ -32,9 +32,21 @@ export default function Map() {
 
     useEffect(() => {
         fetch("/api/media/locations")
-            .then((res) => res.json())
-            .then(setPhotos)
-            .catch((err) => console.error("Failed to laod map photos", err));
+            .then((res) => {
+                if (!res.ok) throw new Error("api returned" + res.status);
+                return res.json();
+            })
+            .then((data) => {
+                if (Array.isArray(data)) {
+                    setPhotos(data);
+                } else {
+                    setPhotos([]);
+                }
+            })
+            .catch((err) => {
+                console.error("Failed to laod map photos", err);
+                setPhotos([]);
+            });
     }, []);
 
     return (
@@ -42,7 +54,7 @@ export default function Map() {
         <MapContainer center={[20, 0]} zoom={2} minZoom={2} maxBounds={[[-90, -180], [90, 180]]} className="h-full w-full" style={{ background: "#0a0a0a" }}>
             <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
 
-            {photos.map((photo) => (
+            {photos && Array.isArray(photos) && photos.map((photo) => (
                 <Marker key={photo.id} position={[photo.gpsLat, photo.gpsLng]} icon={customIcon}>
                     <Popup className="lumi-map-popup">
                         <div className="text-center p-1 flex flex-col items-center">

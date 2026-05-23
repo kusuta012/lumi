@@ -27,7 +27,7 @@ export default function Topbar({ user }: { user: any }) {
     };
 
     return (
-        <header className="h-16 shrink-0 flex items-center justify-between px-6 bg-[#0a0a0a] border-b border-neutral-900 z-50">
+        <header className="h-16 shrink-0 flex items-center justify-between px-6 bg-[#0a0a0a] border-b border-neutral-900 z-[1000]">
             <div className="flex-1 max-w-2xl">
                 <SearchBar />
             </div>

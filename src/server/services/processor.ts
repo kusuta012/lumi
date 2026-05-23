@@ -7,11 +7,13 @@ import exifReader from "exif-reader";
 import { BUCKET_NAME, getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
 import { media, users } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, ne } from "drizzle-orm";
 import fs from "fs/promises";
+import { createReadStream } from "fs";
 import path from "path";
 import os from "os";
 import { redisCache } from "@/lib/cache";
+import crypto from "crypto";
 
 function dmsToDecimal(dms: number[] | undefined, ref: string | undefined): number | null {
   if (!dms || dms.length < 3) return null;
@@ -27,6 +29,16 @@ function dmsToDecimal(dms: number[] | undefined, ref: string | undefined): numbe
   }
 
   return decimal;
+}
+
+async function calcFileHash(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = createReadStream(filePath);
+    stream.on('data', chunk => hash.update(chunk));
+    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('error', reject);
+  })
 }
 
 export async function processMediaItem(mediaId: string) {
@@ -45,6 +57,38 @@ export async function processMediaItem(mediaId: string) {
 
   try {
     await client.fGetObject(bucket, item.objectKey, tempInput);
+
+    const fileHash = await calcFileHash(tempInput);
+    const existingMedia = await db.query.media.findFirst({
+        where: and(
+          eq(media.hash, fileHash),
+          ne(media.hash, "pending")
+        )
+    });
+
+    if (existingMedia) {
+      console.log(`duplicate found for ${item.filename}`)
+      await db.update(media).set({
+        hash: fileHash,
+        objectKey: existingMedia.objectKey,
+        thumbnails: existingMedia.thumbnails,
+        width: existingMedia.width,
+        height: existingMedia.height,
+        duration: existingMedia.duration,
+        dateTaken: existingMedia.dateTaken,
+        cameraModel: existingMedia.cameraModel,
+        gpsLat: existingMedia.gpsLat,
+        gpsLng: existingMedia.gpsLng,
+        storageBackendId: existingMedia.storageBackendId
+      }).where(eq(media.id, item.id));
+
+      const sizeInMB = item.size > 0 ? Math.max(1, Math.round(item.size / (1024 * 1024))) : 0;
+      await db.update(users)
+          .set({ storageUsed: sql`GREATEST(0, ${users.storageUsed} - ${sizeInMB})` })
+          .where(eq(users.id, item.ownerId));
+      await client.removeObject(bucket, item.objectKey);
+      return;
+    }
 
     let width = 0;
     let height = 0;
@@ -185,6 +229,7 @@ export async function processMediaItem(mediaId: string) {
         cameraModel,
         gpsLat,
         gpsLng,
+        hash: fileHash
       })
       .where(eq(media.id, item.id));
 
