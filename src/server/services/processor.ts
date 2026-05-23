@@ -12,6 +12,22 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 
+function dmsToDecimal(dms: number[] | undefined, ref: string | undefined): number | null {
+  if (!dms || dms.length < 3) return null;
+
+  const degrees = dms[0];
+  const minutes = dms[1];
+  const seconds = dms[2];
+
+  let decimal = degrees + (minutes/ 60) + (seconds / 3600);
+
+  if (ref === 'S' || ref === 'W') {
+    decimal = decimal * -1;
+  }
+
+  return decimal;
+}
+
 export async function processMediaItem(mediaId: string) {
   const item = await db.query.media.findFirst({
     where: eq(media.id, mediaId),
@@ -95,19 +111,33 @@ export async function processMediaItem(mediaId: string) {
             if (metadata.exif) {
                 try {
                     const exif = exifReader(metadata.exif) as any;
-                    if (exif.Photo?.DateTimeOriginal instanceof Date) {
-                    dateTaken = exif.Photo.DateTimeOriginal;
+                    const photoData = exif.Photo || exif.exif;
+                    if (photoData?.DateTimeOriginal instanceof Date) {
+                    dateTaken = photoData.DateTimeOriginal;
                     }
-                    if (exif.Image?.Model) {
+                    if (photoData?.DateTimeOriginal && !(photoData.DateTimeOriginal instanceof Date)) {
+                      dateTaken = new Date(photoData.DateTimeOriginal);
+                    }
+
+                    const imageData = exif.Image || exif.image;
+
+                    if (imageData.Image?.Model) {
                     cameraModel = String(exif.Image.Model);
                     }
-                    if (exif.GPS?.Latitude !== undefined) {
-                    const lat = Number(exif.GPS.Latitude);
-                    if (!isNaN(lat)) gpsLat = lat;
-                    }
-                    if (exif.GPS?.Longitude !== undefined) {
-                    const lng = Number(exif.GPS.Longitude);
-                    if (!isNaN(lng)) gpsLng = lng;
+                    const gpsData = exif.GPSInfo || exif.GPS || exif.gps;
+                    if (gpsData) {
+                      const lat = dmsToDecimal(gpsData.GPSLatitude, gpsData.GPSLatitudeRef);
+                      const lng = dmsToDecimal(gpsData.GPSLongitude, gpsData.GPSLongitudeRef);
+
+                      if (lat !== null && !isNaN(lat)) gpsLat = lat;
+                      if (lng !== null && !isNaN(lng)) gpsLng = lng;
+
+                      console.log(`gps ${item.filename}`);
+                      console.log(`raw lat`, gpsData.GPSLatitude, `Ref`, gpsData.GPSLatitudeRef);
+                      console.log(`raw lng`, gpsData.GPSLongitude, `Ref`, gpsData.GPSLongitudeRef);
+                      console.log(`parsed: ${lat}, BOOLL ${lng}`);
+                    } else {
+                      console.log(`no gps metada ${item.filename}`)
                     }
                 } catch (e) { console.warn("could not parse exif for", item.filename); }
               }

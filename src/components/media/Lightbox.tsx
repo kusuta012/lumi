@@ -165,7 +165,7 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
 
     if (!item) return null;
     return (
-        <div className="fixed inset-0 z-[100] bg-black flex overflow-hidden animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[999999] bg-black flex overflow-hidden animate-in fade-in duration-200">
             <div className="flex-1 relative flex flex-col h-full overflow-hidden">
                 <div className="h-16 flex items-center justify-between px-4 bg-gradient-to-b from-black/70 to-transparent absolute top-0 w-full z-20">
                     <button onClick={onClose} className="p-2 text-white/80 hover:text-white transition-colors">
