@@ -5,9 +5,15 @@ import { users, roles } from "@/db/schema"
 import { eq } from "drizzle-orm";
 import { hash } from "bcrypt";
 import { getRegistrationSetting } from "./config-actions";
-import { error } from "console";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function publicRegisterAction(prevState: any, formData: FormData) {
+    const rateLimit = await checkRateLimit("register", 3, 3600);
+    if (!rateLimit.allowed) {
+        const minutesLeft = await checkRateLimit("register", 3, 3600);
+        return { error: `Too many registration attemps. Please try again later in ${minutesLeft} minutes` };
+    }
+
     const isOpen = await getRegistrationSetting();
     if (!isOpen) return { error: "Registration is currently disabled by the admin"};
 

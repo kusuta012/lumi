@@ -55,7 +55,8 @@ export async function toggleTrashAction(
       deletedAt: !currentStatus ? new Date() : null,
     })
     .where(and(eq(media.id, mediaId), eq(media.ownerId, userId)));
-  await redisCache.del(`user_photos_timeline:${userId}`); 
+  await redisCache.del(`user_photos_timeline:${userId}`);
+  await redisCache.del(`user_locations:${userId}`)
   revalidatePath("/trash");
   revalidatePath("/photos");
   revalidatePath("/albums", "layout");
@@ -72,7 +73,8 @@ export async function restoreMediaAction(mediaIds: string[]) {
       and(inArray(media.id, mediaIds), eq(media.ownerId, session.user.id)),
     );
 
-  await redisCache.del(`user_photos_timeline:${session.user.id}`); 
+  await redisCache.del(`user_photos_timeline:${session.user.id}`);
+  await redisCache.del(`user_locations:${session.user.id}`) 
   revalidatePath("/trash");
   revalidatePath("/photos");
   return { success: true };
@@ -154,6 +156,7 @@ export async function deletePermanentlyAction(mediaIds: string[]) {
       }
     }
     await redisCache.del(`user_photos_timeline:${session.user.id}`); 
+    await redisCache.del(`user_locations:${session.user.id}`)
     revalidatePath("/trash");
     revalidatePath("/photos");
     revalidatePath("/albums", "layout");
@@ -176,7 +179,8 @@ export async function bulkMoveToTrashAction(mediaIds: string[]) {
     .where(
       and(inArray(media.id, mediaIds), eq(media.ownerId, session.user.id)),
     );
-  await redisCache.del(`user_photos_timeline:${session.user.id}`); 
+  await redisCache.del(`user_photos_timeline:${session.user.id}`);
+  await redisCache.del(`user_locations:${session.user.id}`)
   revalidatePath("/photos");
   revalidatePath("/albums", "layout");
   return { success: true };

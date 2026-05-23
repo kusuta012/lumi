@@ -11,6 +11,7 @@ import { eq, sql } from "drizzle-orm";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import { redisCache } from "@/lib/cache";
 
 function dmsToDecimal(dms: number[] | undefined, ref: string | undefined): number | null {
   if (!dms || dms.length < 3) return null;
@@ -188,6 +189,10 @@ export async function processMediaItem(mediaId: string) {
       .where(eq(media.id, item.id));
 
       console.log(`processed ${isVideo ? 'video' : 'image'}: ${item.filename}`);
+
+      if (gpsLat !== null && gpsLng !== null) {
+        await redisCache.del(`user_locations:${item.ownerId}`);
+      }
 
   } catch (err) {
     console.error(`error processing for ${item.id}`, err)

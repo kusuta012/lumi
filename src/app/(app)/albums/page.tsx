@@ -5,15 +5,24 @@ import { auth } from "@/server/auth";
 import { Library} from "lucide-react";
 import CreateAlbumButton from "@/components/albums/CreateAlbumButton";
 import AlbumCard from "@/components/albums/AlbumCard";
+import { redisCache } from "@/lib/cache";
 
 export default async function AlbumsPage() {
     const session  = await auth();
     if (!session?.user?.id) return null;
 
-    const userAlbums = await db.query.albums.findMany({
-        where: eq(albums.ownerId, session.user.id),
-        orderBy: [desc(albums.createdAt)],
-    });
+    const cacheKey = `user_albums_grid:${session.user.id}`;
+    let userAlbums = await redisCache.get(cacheKey);
+
+    if (!userAlbums) {
+        userAlbums = await db.query.albums.findMany({
+            where: eq(albums.ownerId, session.user.id),
+            orderBy: [desc(albums.createdAt)],
+        });
+        await redisCache.set(cacheKey, userAlbums, 3600);
+    }
+
+    userAlbums = userAlbums.map((a: any) => ({ ...a, createdAt: new Date(a.createdAt) }));
 
     return (
         <div className="p-8">
@@ -35,11 +44,11 @@ export default async function AlbumsPage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
-                    {userAlbums.map((album) => (
+                    {userAlbums.map((album: any) => (
                         <AlbumCard key={album.id} album={album} />
                     ))}
                 </div>
-            )}
+            )}  
         </div>
     )
 }
