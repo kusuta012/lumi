@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { compare } from "bcrypt";
 import { env } from "@/lib/env";
 import { DefaultSession } from "next-auth";
+import { redisCache } from "@/lib/cache";
 
 declare module "next-auth" {
     interface Session {
@@ -76,6 +77,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (token && session.user) {
                 session.user.id = token.id as string;
                 session.user.roleName = token.roleName as string;
+
+                const isRevoked = await redisCache.get(`revoked_session:${token.id}`);
+                if (isRevoked) {
+                    return null as any;
+                }
             }
             return session;
         }

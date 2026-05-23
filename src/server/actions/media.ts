@@ -6,6 +6,7 @@ import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { mediaQueue } from "@/lib/queue"
 import { eq, sql } from "drizzle-orm"
+import { redisCache } from "@/lib/cache";
  
 export async function recordMediaUpload(data: {
     filename: string;
@@ -38,6 +39,8 @@ export async function recordMediaUpload(data: {
             
             await mediaQueue.add('process', { mediaId: newMedia.id });
         });
+
+        await redisCache.del(`user_photos_timeline:${session.user.id}`);
 
         revalidatePath("/photos");
         revalidatePath("/albums", "layout")
