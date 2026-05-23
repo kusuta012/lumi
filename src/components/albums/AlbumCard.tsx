@@ -7,6 +7,7 @@ import { deleteAlbumAction } from "@/server/actions/album-actions";
 import EditAlbumModal from "./EditAlbumModal";
 import { useRouter } from "next/navigation";
 import ShareModal from "../media/ShareModal";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function AlbumCard({ album }: { album: any }) {
     const router = useRouter();
@@ -15,6 +16,7 @@ export default function AlbumCard({ album }: { album: any }) {
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
     const menuRef = useRef<HTMLDivElement>(null);
+    const { notify } = useNotification();
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -37,7 +39,7 @@ export default function AlbumCard({ album }: { album: any }) {
                 if (res && res.success === true) {
                     router.refresh();
                 } else {
-                    alert(res.error || "Failed to delete album")
+                    notify("error", "Error", "Failed to delete album");
                 } 
             });
         }

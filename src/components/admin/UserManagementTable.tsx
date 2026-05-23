@@ -3,16 +3,18 @@
 import { useTransition } from "react";
 import { toggleUserStatus, updateUserQuotaAction } from "@/server/actions/admin-actions";
 import { UserMinus, UserCheck, Edit2 } from "lucide-react";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function UserManagementTable({ users }: { users: any[] }) {
     const [isPending, startTransition] = useTransition();
+    const { notify } = useNotification();
 
     const handleEditUserQuota = (userId: string, currentGB: number) => {
         const newGb = prompt("Enter new storage limit (GB):", currentGB.toString());
         if (newGb && !isNaN(Number(newGb))) {
             const gbNum = Number(newGb);
             if (gbNum < 1) {
-                alert("Quota must br at least 1 GB");
+                notify("info", "Exception", "Quota must br at least 1 GB");
                 return;
             }
             startTransition(async () => { await updateUserQuotaAction(userId, gbNum * 1024)

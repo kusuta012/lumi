@@ -9,6 +9,7 @@ import { moveToLockedFolder } from "@/server/actions/locked-actions";
 import { restoreFromLockedFolder } from "@/server/actions/locked-actions";
 import { useRouter } from "next/navigation";
 import ShareModal from "./ShareModal";
+import { useNotification } from "../providers/NotificationProvider";
 
 interface LightboxProps {
     items: any[];
@@ -22,6 +23,7 @@ interface LightboxProps {
 
 export default function Lightbox({ items, index, setIndex, onClose, albumId, isOwner = true, allowDownload = true }: LightboxProps) {
     const item = items[index];
+    const { notify } = useNotification();
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showInfo, setShowInfo] = useState(false);
@@ -72,7 +74,7 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
         startTransition(async () => {
             const res = await updateAlbumAction(albumId, { coverMediaId: item.id });
             if(res.success) {
-                alert("Album cover updated!");
+                notify("info", "Updated", 'Album cover was updated');
             }
         });
     }
@@ -89,13 +91,38 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
 
     const handleCopy = async () => {
         try {
-            const res = await fetch(`/api/media/${item.id}?size=medium`);
-            const blob = await res.blob();
-            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-            alert("Copied to clipboard");
+            const res = await fetch(`/api/media/${item.id}`);
+            const webpBlob = await res.blob();
+            const imageUrl = URL.createObjectURL(webpBlob);
+
+            const img = new Image();
+            img.src = imageUrl;
+            img.onload = async () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) return;
+                ctx.drawImage(img, 0, 0);
+
+                canvas.toBlob(async (pngBlob) => {
+                    if (!pngBlob) return;
+                    try {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({ "image/png": pngBlob })
+                        ]);
+                        notify("success", "Copied", "Image copied to clipboard");
+                    } catch (e) {
+                        console.error("clipboard write failed", e);
+                        notify("error", "Failed", "Failed to Copy to clipboard");
+                    } finally {
+                        URL.revokeObjectURL(imageUrl);
+                    }
+                }, "image/png");
+            };
         } catch (e) {
-            console.error(e)
-            alert("failed");
+            console.error("Copy process failed", e);
+            notify("error", "Error", "Failed to processs image");
         }
     };
 

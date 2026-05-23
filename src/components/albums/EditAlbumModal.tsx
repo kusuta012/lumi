@@ -3,19 +3,21 @@
 import { X, Edit2, ImagePlus, Loader2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { updateAlbumAction, uploadNewCoverAction } from "@/server/actions/album-actions";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function EditAlbumModal({ album, onClose }: {album: any, onClose: () => void }) {
     const [name , setName] = useState(album.name || "");
     const [description, setDescription] = useState(album.description || "")
     const [isPending, startTransition] = useTransition();
     const [isUploading, setIsUploading] = useState(false);
+    const { notify } = useNotification();
 
     const handleSave = () => {
         if (!name.trim()) return;
         startTransition(async () => {
             const res = await updateAlbumAction(album.id, { name: name.trim(), description: description.trim() });
             if (res.success) onClose();
-            else alert(res.error);
+            else notify("error", "Error", `${res.error}`);
         });
     };
 
@@ -47,7 +49,7 @@ export default function EditAlbumModal({ album, onClose }: {album: any, onClose:
             if (!actionRes.success) throw new Error(actionRes.error);
         } catch (err) {
             console.error(err);
-            alert("failed to upload new cover");
+            notify("error", "Error", "failed to upload new cover");
         } finally {
             setIsUploading(false);
             e.target.value = "";

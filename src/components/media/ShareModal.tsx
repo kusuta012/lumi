@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { X, Share2, Download, Clock, Copy, Check, UploadCloud, Lock } from "lucide-react";
 import { createShareLink, shareBulkMedia } from "@/server/actions/share-actions";
+import { useNotification } from "../providers/NotificationProvider";
 
 interface ShareModalProps {
     targetId?: string;
@@ -13,6 +14,7 @@ interface ShareModalProps {
 }
 
 export default function ShareModal({ targetId, selectedIds, type, onClose, onSuccess }: ShareModalProps) {
+    const { notify } = useNotification();
     const [isPending, startTransition] = useTransition();
     const [shareUrl, setShareUrl] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
@@ -42,7 +44,7 @@ export default function ShareModal({ targetId, selectedIds, type, onClose, onSuc
                 setShareUrl(`${window.location.origin}/s/${res.token}`);
                 if (onSuccess) onSuccess();
             } else {
-                alert(res?.error || "failed to create share link");
+                notify("error", "Failed", `${res?.error}"`);
             }
         });
     };

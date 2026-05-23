@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { publicUploadToSharedAlbum } from "@/server/actions/share-actions";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function PublicUploadButton({ token }: { token: string }) {
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState("");
+    const { notify } = useNotification();
 
     const onFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -50,7 +52,7 @@ export default function PublicUploadButton({ token }: { token: string }) {
             }
             window.location.reload();
         } catch (err: any) {
-            alert(err.message || "failed to upload file");
+            notify("error", "Error", "failed to upload file");
         } finally {
             setLoading(false);
             setProgress("");

@@ -5,8 +5,10 @@ import { useState, useTransition } from "react";
 import { deleteAlbumAction } from "@/server/actions/album-actions";
 import EditAlbumModal from "./EditAlbumModal";
 import { useRouter } from "next/navigation";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function AlbumHeadersAction({ album }: { album: any }) {
+    const { notify } = useNotification();
     const router = useRouter();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
@@ -19,7 +21,7 @@ export default function AlbumHeadersAction({ album }: { album: any }) {
                     router.push("/albums");
                     router.refresh();
                 } else {
-                    alert(res.error || "Failed toe delete album")
+                    notify("error", "Error", "Failed toe delete album")
                 }
             });
         }

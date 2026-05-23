@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { recordMediaUpload } from "@/server/actions/media";
 import { UploadCloud } from "lucide-react";
-import { error } from "node:console";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function UploadButton() {
+    const { notify } = useNotification();
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState("");
     const onFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,11 +58,11 @@ export default function UploadButton() {
                 successCount++;
             }
 
-            if (successCount > 0) alert(`successfully uploaded ${successCount} files`);
-            if (skippedCount > 0) alert(`${skippedCount} files were skipped (unsupported format)`);
+            if (successCount > 0) notify("success", "Upload Complete", `successfully uploaded ${successCount} files`);
+            if (skippedCount > 0) notify("info", "Files Skipped", `${skippedCount} files were skipped (unsupported format)`);
         } catch (err: any) {
             console.error("batch upload failed", err);
-            alert(`Upload failed ${err.message || "unknown erorr"}`);
+            notify("error", "Upload Failed", err.message || "unknown erorr");
         } finally {
             setLoading(false);
             setProgress("");

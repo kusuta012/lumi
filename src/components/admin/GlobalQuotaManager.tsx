@@ -3,17 +3,19 @@
 import { useState, useTransition } from "react";
 import { updateAllUsersQuotaAction } from "@/server/actions/admin-actions";
 import { HardDrive } from "lucide-react";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function GlobalQuotaManger() {
     const [isPending, startTransition] = useTransition();
     const [val, setVal] = useState(5);
+    const { notify } = useNotification();
 
     const handleBulkUpdate = () => {
         const mb = val * 1024;
         if (confirm(`Set storage quota to ${val}GB for ALL users? this will override individual settings`)) {
             startTransition(async () => {
                 await updateAllUsersQuotaAction(mb);
-                alert("All users updated to " + val + "GB");
+                notify("success", "Done", `All users updated to " + ${val} + "GB"`);
             });
         }
     };

@@ -5,8 +5,8 @@ import Lightbox from "./Lightbox";
 import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw } from "lucide-react";
 import AddToAlbumModal from "./AddToAlbumModal";
 import { restoreMediaAction, deletePermanentlyAction, bulkMoveToTrashAction } from "@/server/actions/media-mutations";
-import shareModal from './ShareModal';
 import ShareModal from "./ShareModal";
+import { useNotification } from "../providers/NotificationProvider";
 
 interface MediaItem {
     id: string,
@@ -36,6 +36,7 @@ interface Props {
 }
 
 export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
+    const { notify } = useNotification();
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [showAlbumModal, setShowAlbumModal] = useState(false);

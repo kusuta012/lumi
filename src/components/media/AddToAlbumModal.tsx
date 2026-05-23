@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { X, FolderPlus, Library } from "lucide-react";
 import { addToAlbumAction, addMediaToExistingAlbumAction } from "@/server/actions/album-actions";
+import { useNotification } from "../providers/NotificationProvider";
 
 interface Props {
     selectedIds: string[];
@@ -14,6 +15,7 @@ export default function AddToAlbumModal({ selectedIds, onClose, onSuccess }: Pro
     const [tab, setTab] = useState<'new' | 'existing'>('new');
     const [existingAlbums, setExistingAlbums] = useState<any[]>([]);
     const [isPending, startTransition] = useTransition();
+    const { notify } = useNotification();
 
     useEffect(() => {
         fetch('/api/albums').then(res => res.json()).then(setExistingAlbums);
@@ -39,7 +41,7 @@ export default function AddToAlbumModal({ selectedIds, onClose, onSuccess }: Pro
                 onSuccess();
                 onClose();
             } else {
-                alert(res.error);
+                notify("error", "Error", `${res.error}`);
             }
         });
     };

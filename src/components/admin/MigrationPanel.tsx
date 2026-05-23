@@ -2,19 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { triggerMigration } from "@/server/actions/storage-actions";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function MigrationPanel({ backends }: { backends: any[] }) {
     const [source, setSource] = useState("");
     const [target, setTarget] = useState("");
     const [isPending, startTransition] = useTransition();
+    const { notify } = useNotification();
 
     const handleMigrate = () => {
-        if (source === target) return alert("source and target must be diffrent");
+        if (source === target) return notify("error", "Exception", "source and target must be diffrent");
         if (confirm("Begin migrating data? any interruption might lead to corrupt data")) {
             startTransition(async () => {
                 const res = await triggerMigration(source, target);
-                if (!res.success) alert(res.error);
-                else alert("migration job queued");
+                if (!res.success) notify("error", "Error", `${res.error}`);
+                else notify("info", "Queued", "migration job queued");
             });
         }
     };

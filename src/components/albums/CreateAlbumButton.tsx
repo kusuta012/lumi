@@ -3,15 +3,17 @@
 import { Plus } from "lucide-react";
 import { createEmptyAlbumAction } from "@/server/actions/album-actions";
 import { useTransition } from "react";
+import { useNotification } from "../providers/NotificationProvider";
 
 export default function CreateAlbumButton() {
+    const { notify } = useNotification();
     const [isPending, startTransition] = useTransition();
     const handleCreate = () => {
         const name = prompt("Enter album name:");
         if (name && name.trim()) {
             startTransition(async () => {
                 const res = await createEmptyAlbumAction(name.trim());
-                if (!res.success) alert(res.error);
+                if (!res.success) notify("error", "Error", `${res.error}`);
             });
         }
     };
