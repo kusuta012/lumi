@@ -26,7 +26,7 @@ export default async function FavoritesPage() {
                     Favorites
                 </h1>
             </div>
-            <TimelineGallery initialMedia={items as any} startYear={startYear} endYear={endYear} / >
+            <TimelineGallery initialMedia={items as any} startYear={startYear} endYear={endYear} emptyMessage="You don't have any favorites." / >
         </div>
     );
 }

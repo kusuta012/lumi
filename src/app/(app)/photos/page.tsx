@@ -37,6 +37,6 @@ export default async function PhotosPage() {
     const endYear = years.length > 0 ? years[years.length -1] : startYear;
 
     return (
-        <TimelineGallery initialMedia={userMedia} startYear={startYear} endYear={endYear} />
+        <TimelineGallery initialMedia={userMedia} startYear={startYear} endYear={endYear} emptyMessage="You don't have any media." />
     );
 }

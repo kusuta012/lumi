@@ -99,6 +99,12 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         }
     }, [selectedIndex, mediaItems.length, hasMore, isLoadingMore, loadMorePhotos]);
 
+    useEffect(() => {
+        setMediaItems(initialMedia);
+        setCursor(initialMedia.length >= 50 ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null);
+        setHasMore(initialMedia.length >= 50);
+    }, [initialMedia]);
+
     const groupedMedia = mediaItems.reduce<Record<string, MediaItem[]>>((acc, item) => {
         const d = item.dateTaken ? new Date(item.dateTaken) : new Date(item.createdAt);
         const dateKey = d.toLocaleDateString('en-US', {

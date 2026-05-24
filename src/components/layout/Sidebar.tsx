@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {
-    Image as ImageIcon, Search, Map, Users, Heart, Library, Archive, Lock, Trash2, Info, Hammer
+    Image as ImageIcon, Search, Map, Users, Heart, Library, Archive, Lock, Trash2, Info, Hammer, Settings
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -27,6 +27,7 @@ export default function Sidebar({ userRole, storageUsed = 0, storageQuota = 5120
         { icon: Archive, label: "Archive", href: "/archives" },
         { icon: Lock, label: "Locked Folder", href: "/locked" },
         { icon: Trash2, label: "Trash", href: "/trash" },
+        { icon: Settings, label: "Settings", href: "/settings"},
     ];
     const isActive = (path: string) => pathname === path;
     const percentUsed = Math.min(100, (storageUsed / storageQuota) * 100);
@@ -73,17 +74,20 @@ export default function Sidebar({ userRole, storageUsed = 0, storageQuota = 5120
             )}
 
             <div className="p-4 border-t border-border shrink-0">
-                <div className="bg-surface rounded-lg p-4">
+                <div className="bg-surface-hover border border-border rounded-xl p-4 shadow-sm">
                     <p className="text-xs font-medium text-foreground mb-1">Storage Space</p>
                     <p className="text-[10px] text-muted mb-2">{(storageUsed / 1024).toFixed(2)} GB / {(storageQuota / 1024).toFixed(2)} GB</p>
-                    <div className="w-full h-1 bg-surface-hover rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-background/50 border border-border rounded-full overflow-hidden">
                         <div className="bg-orange-500 h-full transition-all duration-1000" style={{ width: `${percentUsed}%` }} />
                     </div>
                 </div>
                 <div className="flex items-center justify-between mt-4 text-[10px] text-muted px-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500">
-                        Server Online
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span className="text-muted tracking-wider text-[10px]">
+                            Server Online
+                        </span>
+                    </div>
                     <Info className="w-4 h-4 cursor-pointer hover:text-foreground" />
                 </div>
             </div>
