@@ -5,6 +5,7 @@ import { processMediaItem } from '@/server/services/processor';
 import { env } from '@/lib/env'
 import { migrationQueue } from "@/lib/queue";
 import { processMigrationJob } from "@/server/services/migration-processor";
+import { cleanExpiredTrash } from "@/server/actions/media-mutations";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -29,3 +30,8 @@ const migrator = new Worker('storage-migration', async (job) => {
 }, { connection });
 
 console.log("lumi migration worker is actibe");
+
+cleanExpiredTrash();
+setInterval(() => {
+    cleanExpiredTrash();
+}, 86400000);

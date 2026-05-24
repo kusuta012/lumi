@@ -234,6 +234,8 @@ export async function processMediaItem(mediaId: string) {
       .where(eq(media.id, item.id));
 
       console.log(`processed ${isVideo ? 'video' : 'image'}: ${item.filename}`);
+      await redisCache.del(`user_photos_timeline:${item.ownerId}`);
+      await redisCache.del(`user_albums_grid:${item.ownerId}`);
 
       if (gpsLat !== null && gpsLng !== null) {
         await redisCache.del(`user_locations:${item.ownerId}`);
