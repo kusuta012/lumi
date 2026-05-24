@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { albumMedia, media, albums, users, storageBackends } from "@/db/schema";
-import { eq, and, inArray, notInArray, sql, count } from "drizzle-orm";
+import { eq, and, inArray, notInArray, sql, count, lt } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { getStorageClient } from "@/lib/storage";
@@ -205,7 +205,7 @@ export async function cleanExpiredTrash() {
     const expiredItems = await db.select().from(media).where(
       and(
         eq(media.isDeleted, true),
-        sql`${media.deletedAt} < ${thirtDaysAgo}`
+        lt(media.deletedAt, thirtDaysAgo)
       )
     );
 

@@ -129,7 +129,7 @@ export default async function AdminPage() {
                 <Link href="/admin/storage" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
                     STORAGE CONFIG
                 </Link>
-                <Link href="/admin/users" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
+                <Link href="/admin/workers" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
                     WORKER QUEUES
                 </Link>
                 <Link href="/admin/audit" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
