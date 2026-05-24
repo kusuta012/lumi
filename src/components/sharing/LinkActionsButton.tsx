@@ -14,7 +14,7 @@ export function CopyLink({ token }: { token: string }) {
     };
 
     return (
-        <button onClick={handleCopy} className="p-2 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors" title="Copy Link">
+        <button onClick={handleCopy} className="p-2 text-muted hover:text-foreground rounded-lg hover:bg-surface-hover transition-colors" title="Copy Link">
             {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
         </button>
     );
@@ -31,7 +31,7 @@ export function DeleteLink({ linkId }: { linkId: string }) {
     };
 
     return (
-        <button onClick={handleDelete} disabled={isPending} className="p-2 text-neutral-400 hover:text-red-500 rounded-lg hover:bg-red-950/20 transition-colors disabled:opacity-50">
+        <button onClick={handleDelete} disabled={isPending} className="p-2 text-muted hover:text-red-500 rounded-lg hover:bg-red-950/20 transition-colors disabled:opacity-50">
             <Trash2 size={16} />
         </button>
     );

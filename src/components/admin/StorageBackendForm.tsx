@@ -27,19 +27,19 @@ export default function StorageBackendForm() {
 
     return (
         <form ref={formRef} action={handleAction} className="space-y-4">
-            <h2 className="text-white font-bold text-sm mb-4">mount new storage</h2>
+            <h2 className="text-foreground font-bold text-sm mb-4">mount new storage</h2>
             <div className="grid grid-cols-2 gap-4">
-                <input name="name" placeholder="Name" required className="bg-[#111] border border-neutral-700 text-sm p-2 text-white outline-none focus:border-orange-500" />
-                <select name="type" className="bg-[#111] border border-neutral-700 text-sm p-2 text-white outline-none focus:border-orange-500">
+                <input name="name" placeholder="Name" required className="bg-surface border border-border text-sm p-2 text-foreground outline-none focus:border-orange-500" />
+                <select name="type" className="bg-surface border border-border text-sm p-2 text-foreground outline-none focus:border-orange-500">
                     <option value="minio">MinIO / S3</option>
                 </select>
-                <input name="endpoint" placeholder="Endpoint / Path" required className="col-span-2 bg-[#111] border border-neutral-700 text-sm p-2 text-white outline-none focus:border-orange-500" />
-                <input name="port" placeholder="Port" className="col-span-2 bg-[#111] border border-neutral-700 text-sm p-2 text-white outline-none focus:border-orange-500" />
-                <input name="bucket" placeholder="Bucket Name" required className="col-span-2 bg-[#111] border border-neutral-700 text-sm p-2 text-white outline-none focus:border-orange-500" />
-                <input name="accessKey" placeholder="Access Key" required className="col-span-2 bg-[#111] border border-neutral-700 text-sm p-2 text-white outline-none focus:border-orange-500" />
-                <input name="secretKey" placeholder="Secret Key" type="password" required className="col-span-2 bg-[#111] border border-neutral-700 text-sm p-2 text-white outline-none focus:border-orange-500" />
+                <input name="endpoint" placeholder="Endpoint / Path" required className="col-span-2 bg-surface border border-border text-sm p-2 text-foreground outline-none focus:border-orange-500" />
+                <input name="port" placeholder="Port" className="col-span-2 bg-surface border border-border text-sm p-2 text-foreground outline-none focus:border-orange-500" />
+                <input name="bucket" placeholder="Bucket Name" required className="col-span-2 bg-surface border border-border text-sm p-2 text-foreground outline-none focus:border-orange-500" />
+                <input name="accessKey" placeholder="Access Key" required className="col-span-2 bg-surface border border-border text-sm p-2 text-foreground outline-none focus:border-orange-500" />
+                <input name="secretKey" placeholder="Secret Key" type="password" required className="col-span-2 bg-surface border border-border text-sm p-2 text-foreground outline-none focus:border-orange-500" />
             </div>
-            <button type="submit" disabled={isPending} className="w-full mt-4 py-2 border border-neutral-600 text-neutral-300 font-bold text-xs hover:bg-white hover:text-black transition-colors disabled:opacity-50">
+            <button type="submit" disabled={isPending} className="w-full mt-4 py-2 border border-border text-foreground font-bold text-xs hover:bg-foreground hover:text-background transition-colors disabled:opacity-50">
                 {isPending ? "Registering.." : "Register Backend"}
             </button>
         </form>

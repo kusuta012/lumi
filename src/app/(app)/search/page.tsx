@@ -32,10 +32,10 @@ export default async function SearchPage({
 
     return (
         <div>
-            <div className="px-6 py-8 border-b border-neutral-900">
-                <h1 className="text-2xl font-bold text-white">Search Results</h1>
-                <p className="text-neutral-400 text-sm mt-1">
-                    Found {results.length} results for <span className="text-white-400">{query}</span>
+            <div className="px-6 py-8 border-b border-border">
+                <h1 className="text-2xl font-bold text-foreground">Search Results</h1>
+                <p className="text-muted text-sm mt-1">
+                    Found {results.length} results for <span className="text-foreground-400">{query}</span>
                 </p>
             </div>
 

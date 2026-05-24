@@ -7,7 +7,7 @@ const MapComponent = dynamic(
     {
         ssr: false,
         loading: () => (
-            <div className="h-full w-full flex items-center justify-center bg-[#0a0a0a] text-neutral-500 text-xs tracking-widest">
+            <div className="h-full w-full flex items-center justify-center bg-background text-muted text-xs tracking-widest">
                 Initializing Globe...
             </div>
         )

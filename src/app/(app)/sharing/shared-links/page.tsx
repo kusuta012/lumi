@@ -34,42 +34,42 @@ export default async function SharedLinks() {
     }));
 
     return (
-        <div className="p-8 space-y-8 text-neutral-200">
-            <Link href="/sharing" className="flex items-center gap-2 text-neutral-500 hover:text-orange-500 transition-colors text-sm font-bold tracking-tight">
+        <div className="p-8 space-y-8 text-foreground">
+            <Link href="/sharing" className="flex items-center gap-2 text-muted hover:text-orange-500 transition-colors text-sm font-bold tracking-tight">
                 <ArrowLeft size={16} /> Back to Sharing
             </Link>
-            <header className="border-b border-neutral-900 pb-6">
-                <h1 className="text-xl font-bold text-white tracking-wider">Shared Links</h1>
-                <p className="text-neutral-500 text-xs mt-2 font-bold tracking-widest">Active links</p>
+            <header className="border-b border-border pb-6">
+                <h1 className="text-xl font-bold text-foreground tracking-wider">Shared Links</h1>
+                <p className="text-muted text-xs mt-2 font-bold tracking-widest">Active links</p>
             </header>
 
             {resolvedLinks.length === 0 ? (
-                <p className="text-xs text-neutral-500 bg-[#0a0a0a] border border-neutral-900 p-6 rounded-xl border-dashed">
+                <p className="text-xs text-muted bg-background border border-border p-6 rounded-xl border-dashed">
                     You haven't generated any shared links yet
                 </p>
             ) : (
-                <div className="border border-neutral-900 bg-[#0a0a0a] rounded-2xl overflow-hidden divide-y divide-neutral-900">
+                <div className="border border-border bg-background rounded-2xl overflow-hidden divide-y divide-border">
                     {resolvedLinks.map((link) => {
                         const isExpired = link.expiresAt && new Date(link.expiresAt) < new Date();
 
                         return (
-                            <div key={link.id} className="p-4 flex items-center justify-between gap-6 hover:bg-neutral-900/10 transition-colors">
+                            <div key={link.id} className="p-4 flex items-center justify-between gap-6 hover:bg-surface/10 transition-colors">
                                 <div className="flex items-center gap-4 min-w-0">
-                                    <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 shrink-0 overflow-hidden">
+                                    <div className="w-12 h-12 rounded-lg bg-surface border border-border shrink-0 overflow-hidden">
                                         {link.coverId ? (
                                             <img src={`/api/media/${link.coverId}?size=small`} className="w-full h-full object-cover" alt="" />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-neutral-600">
+                                            <div className="w-full h-full flex items-center justify-center text-muted">
                                                 <Clock size={16}></Clock>
                                             </div>
                                         )}
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="text-[10px] font-mono text-neutral-500 tracking-widest flex items-center gap-1.5">
+                                        <p className="text-[10px] font-mono text-muted tracking-widest flex items-center gap-1.5">
                                             Expires: {link.expiresAt ? format(new Date(link.expiresAt), "dd MM yyyy") : "∞"}
                                             {isExpired && <span className="text-red-500 font-bold ml-1">(EXPIRED)</span>}
                                         </p>
-                                        <h3 className="text-sm font-bold text-white mt-1 truncate max-w-wd">{link.name}</h3>
+                                        <h3 className="text-sm font-bold text-foreground mt-1 truncate max-w-wd">{link.name}</h3>
                                         <div className="flex gap-1.5 mt-2">
                                             {link.allowUpload && <span className="text-[9px] font-bold bg-orange-500/10 text-orange-500 border border-orange-500/20 px-1.5 py-0/5 rounded">UPLOAD</span>}
                                             {link.allowDownload && <span className="text-[9px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 px-1.5 py-0/5 rounded">DOWNLOAD</span>}

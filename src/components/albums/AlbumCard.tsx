@@ -57,36 +57,36 @@ export default function AlbumCard({ album }: { album: any }) {
         <>
             <div className="relative group">
                 <Link href={`/albums/${album.id}`} className="block">
-                    <div className="aspect-square bg-neutral-900 rounded-2xl overflow-hidden mb-3 relative border border-neutral-800 shadow-lg group-hover:border-orange-500/50 transition-all">
+                    <div className="aspect-square bg-surface rounded-2xl overflow-hidden mb-3 relative border border-border shadow-lg group-hover:border-orange-500/50 transition-all">
                         {album.coverMediaId ? (
                             <img src={`/api/media/${album.coverMediaId}?size=medium`} alt={album.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-neutral-700">
+                            <div className="w-full h-full flex items-center justify-center text-muted">
                                 <Library size={40} />
                             </div>
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10 opacity-60 group-hover:opacity-80 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-background/10 opacity-60 group-hover:opacity-80 transition-opacity" />
                     </div>
-                    <h3 className="text-sm font-bold text-neutral-200 group-hover:text-orange-500 transition-colors truncate pr-8">{album.name}</h3>
+                    <h3 className="text-sm font-bold text-foreground group-hover:text-orange-500 transition-colors truncate pr-8">{album.name}</h3>
                     {album.description && (
-                        <p className="text-xs text-neutral-400 mt-0.5 truncate">{album.description}</p>
+                        <p className="text-xs text-muted mt-0.5 truncate">{album.description}</p>
                     )}
                 </Link>
-                <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(!menuOpen); }} className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-md border-transition-all z-10 ${menuOpen? 'bg-neutral-800 border-neutral-600 opacity-100 text-white' : 'bg-black/40 border-white/10 text-white/80 opacity-0 group-hover:opacity-100 hover:bg-black/60 hover:text-white'}`}>
+                <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(!menuOpen); }} className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-md border-transition-all z-10 ${menuOpen? 'bg-surface-hover border-border opacity-100 text-foreground' : 'bg-background/40 border-white/10 text-foreground/80 opacity-0 group-hover:opacity-100 hover:bg-background/60 hover:text-foreground'}`}>
                     <MoreVertical size={18} />
                 </button>
                 {menuOpen && (
-                    <div ref={menuRef} className="absolute top-12 right-2 w-48 bg-[#1f1f1f] border border-neutral-700 rounded-lg shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                        <button onClick={(e) => { e.stopPropagation(); setIsEditModalOpen(true); setMenuOpen(false); }} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors">
+                    <div ref={menuRef} className="absolute top-12 right-2 w-48 bg-surface border border-border rounded-lg shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                        <button onClick={(e) => { e.stopPropagation(); setIsEditModalOpen(true); setMenuOpen(false); }} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-foreground hover:bg-surface-hover hover:text-foreground transition-colors">
                             <Edit2 size={16} /> Edit Album
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); setIsShareModalOpen(true); setMenuOpen(false); }} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); setIsShareModalOpen(true); setMenuOpen(false); }} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-foreground hover:bg-surface-hover hover:text-foreground transition-colors">
                             <Share2 size={16} /> Share
                         </button>
-                        <button onClick={handleDownload} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors">
+                        <button onClick={handleDownload} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-foreground hover:bg-surface-hover hover:text-foreground transition-colors">
                             <Download size={16} /> Download
                         </button>
-                        <div className="h-px bg-neutral-800 my-1 w-full" />
+                        <div className="h-px bg-surface-hover my-1 w-full" />
                             <button onClick={handleDelete} disabled={isPending} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-colors">
                                 <Trash2 size={16} /> Delete
                             </button>

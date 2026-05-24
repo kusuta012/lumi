@@ -81,17 +81,17 @@ export default function NotificationProvider({ children }: { children: React.Rea
             {mounted && createPortal(
                 <div className="fixed bottom-6 right-6 z-[999999] flex flex-col gap-3 pointer-events-none">
                     {notifications.filter(n => n.showToast).map(n => (
-                        <div key={n.id} className="pointer-events-auto w-80 bg-[#1a1a1a] border border-neutral-800 rounded-xl shadow-2xl p-4 flex items-start gap-3 animate-in slide-in-from-right-8 fade-in duration-300">
+                        <div key={n.id} className="pointer-events-auto w-80 bg-surface border border-border rounded-xl shadow-2xl p-4 flex items-start gap-3 animate-in slide-in-from-right-8 fade-in duration-300">
                             <div className="shrink-0 mt-0.5">
                                 {n.type === 'success' && <CheckCircle2 className="text-emerald-500 w-5 h-5" />}
                                 {n.type === 'error' && <AlertCircle className="text-red-500 w-5 h-5" />}
                                 {n.type === 'info' && <Info className="text-blue-500 w-5 h-5" />}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-bold text-white truncate">{n.title}</h4>
-                                {n.message && <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{n.message}</p>}
+                                <h4 className="text-sm font-bold text-foreground truncate">{n.title}</h4>
+                                {n.message && <p className="text-xs text-muted mt-1 line-clamp-2">{n.message}</p>}
                             </div>
-                            <button onClick={() => dismissToast(n.id)} className="text-neutral-500 hover:text-white transition-colors shrink-0">
+                            <button onClick={() => dismissToast(n.id)} className="text-muted hover:text-foreground transition-colors shrink-0">
                                 <X size={16} />
                             </button>
                         </div>

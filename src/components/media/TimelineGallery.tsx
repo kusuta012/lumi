@@ -31,8 +31,6 @@ interface Props {
     albumId?: string;
     isOwner?: boolean;
     allowDownload?: boolean;
-    isLockedPage?: boolean;
-
 }
 
 export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
@@ -66,6 +64,24 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         );
     };
 
+    const isDateGroupAllSelected = (items: MediaItem[]) => {
+        return items.every(item => selectedIds.includes(item.id));
+    };
+
+    const toggleSelectDateGroup = (items: MediaItem[], e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const allSelected = isDateGroupAllSelected(items);
+        const groupIds = items.map(item => item.id);
+
+        if (allSelected) {
+            setSelectedIds(prev => prev.filter(id => !groupIds.includes(id)));
+        } else {
+            setSelectedIds(prev => [...new Set([...prev, ...groupIds])]);
+        }
+    };
+
     const clearSelection = () => setSelectedIds([]);
     const [isPending, startTransition] = useTransition();
     const handleRestore = () => {
@@ -93,12 +109,12 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     return(
         <div className="p-6 pb-24 relative">
             {isSelectionMode && (
-                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] flex items-center gap-6 px-6 py-3 bg-neutral-900 border border-neutral-800 rounded-full shadow-2xl animate-in slide-in-from-top duration-300">
-                    <div className="flex items-center gap-3 pr-4 border-r border-neutral-800">
-                        <button onClick={clearSelection} className="p-1 hover:bg-neutral-800 rounded-full transition-colors">
-                            <X size={18} className="text-neutral-400" />
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] flex items-center gap-6 px-6 py-3 bg-surface border border-border rounded-full shadow-2xl animate-in slide-in-from-top duration-300">
+                    <div className="flex items-center gap-3 pr-4 border-r border-border">
+                        <button onClick={clearSelection} className="p-1 hover:bg-surface-hover rounded-full transition-colors">
+                            <X size={18} className="text-muted" />
                         </button>
-                        <span className="text-sm font-bold text-white">{selectedIds.length} selected</span>
+                        <span className="text-sm font-bold text-foreground">{selectedIds.length} selected</span>
                     </div>
                     <div className="flex items-center gap-5">
                         {isTrashPage ? (
@@ -112,10 +128,10 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                             </>
                         ) : (
                             <>
-                            <button onClick={() => setShowAlbumModal(true)} className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-orange-500 transition-colors">
+                            <button onClick={() => setShowAlbumModal(true)} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-orange-500 transition-colors">
                             <Plus size={18} />
                         </button>
-                        <button onClick={() => setShowShareModal(true)} className="flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors">
+                        <button onClick={() => setShowShareModal(true)} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors">
                             <Share2 size={18} />
                         </button>
                         <button onClick={handleBulkTrash} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors">
@@ -128,41 +144,49 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
             )}
 
             {initialMedia.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-neutral-500">
+                <div className="flex flex-col items-center justify-center h-64 text-muted">
                     <p>{emptyMessage}</p>
                 </div>
             ) : (
                 <div className="space-y-12">
-                    {sortedGroups.map(([date, items]) => (
-                        <div key={date}>
-                            <h2 className="text-sm font-semibold text-neutral-300 mb-4 sticky top-0 py-2 bg-[#0a0a0a]/80 backdrop-blur-md z-10">{date}</h2>
+                    {sortedGroups.map(([date, items]) => {
+                        const isAllSelected = isDateGroupAllSelected(items);
+                        return (
+                            <div key={date}>
+                            <div className="flex items-center gap-2 mb-4 sticky top-0 py-2 bg-background/80 backdrop-blur-md z-10 group/date">
+                            <button onClick={(e) => toggleSelectDateGroup(items, e)} className={`transition-all duration-200 active:scale-90 ${isAllSelected ? 'opacity-100 text-orange-500' : 'opacity-0 group-hover/date:opacity-100 text-muted hover:text-foreground'}`}>
+                                <CheckCircle2 size={18} />
+                            </button>
+                            <h2 className="text-sm font-semibold text-foreground">{date}</h2>
+                            </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
                                 {items.map((item) => {
                                     const isSelected = selectedIds.includes(item.id);
                                     return(
-                                        <div key={item.id} onClick={() => isSelectionMode ? toggleSelect(item.id) : setSelectedIndex(initialMedia.indexOf(item))} className={`relative group aspect-square bg-neutral-900 overflow-hidden cursor-pointer transition-all duration-300 ${ isSelected ? 'ring-4 ring-orange-500 ring-inset' : 'hover:ring-2 ring-orange-500'}`}>
+                                        <div key={item.id} onClick={() => isSelectionMode ? toggleSelect(item.id) : setSelectedIndex(initialMedia.indexOf(item))} className={`relative group aspect-square bg-surface overflow-hidden cursor-pointer transition-all duration-300 ${ isSelected ? 'ring-4 ring-orange-500 ring-inset' : 'hover:ring-2 ring-orange-500'}`}>
                                         <img src={`/api/media/${item.id}?size=small`} alt={item.filename} className={`w-full h-full object-cover transition-transform duration-500 ${isSelected ? 'scale-90 opacity-80' : 'group-hover:scale-110'}`} loading="lazy" />
-                                        <button onClick={(e) => toggleSelect(item.id, e)} className={`absolute top-2 left-2 z-20 transition-opactiy duration-200 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                        <div className={`rounded-full p-0.5 ${isSelected ? 'bg-orange-500 text-white' : 'bg-black/40 text-white/70 backdrop-blur-md border border-white/20'}`}>
+                                        <button onClick={(e) => toggleSelect(item.id, e)} className={`absolute top-2 left-2 z-20 transition-all duration-200 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                        <div className={`rounded-full p-0.5 ${isSelected ? 'bg-orange-500 text-foreground' : 'bg-background/40 text-foreground/70 backdrop-blur-md border border-white/20'}`}>
                                             <CheckCircle2 size={20} />
                                         </div>
                                         </button>
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200" />
+                                        <div className="absolute inset-0 bg-background/0 group-hover:bg-background/10 transition-all duration-200" />
                                     </div>
                                     );
                                 })}
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
-            <div className="fixed right-4 top-24 bottom-12 w-6 hidden xl:flex flex-col items-center justify-between py-4 text-[11px] text-neutral-500 font-bold z-10 pointer-events-none">
+            <div className="fixed right-4 top-24 bottom-12 w-6 hidden xl:flex flex-col items-center justify-between py-4 text-[11px] text-muted font-bold z-10 pointer-events-none">
                 <span>{startYear}</span>
-                <div className="flex-1 w-[1px] bg-neutral-800 my-4 relative">
-                    <div className="absolute top-[25%] w-1.5 h-1.5 rounded-full bg-neutral-700 -left-[2.5px]"></div>
-                    <div className="absolute top-[50%] w-1.5 h-1.5 rounded-full bg-neutral-700 -left-[2.5px]"></div>
-                    <div className="absolute top-[75%] w-1.5 h-1.5 rounded-full bg-neutral-700 -left-[2.5px]"></div>
+                <div className="flex-1 w-[1px] bg-surface-hover my-4 relative">
+                    <div className="absolute top-[25%] w-1.5 h-1.5 rounded-full bg-surface-hover -left-[2.5px]"></div>
+                    <div className="absolute top-[50%] w-1.5 h-1.5 rounded-full bg-surface-hover -left-[2.5px]"></div>
+                    <div className="absolute top-[75%] w-1.5 h-1.5 rounded-full bg-surface-hover -left-[2.5px]"></div>
                 </div>
                 <span>{endYear}</span>
             </div>

@@ -12,14 +12,14 @@ export default function RegistrationToggle({  isEnabled }: { isEnabled: boolean 
     };
 
     return (
-        <div className="flex items-center justify-between p-3 border border-neutral-700 bg-[#111]">
+        <div className="flex items-center justify-between p-3 border border-border bg-surface">
             <div>
-                <span className="text-white font-bold text-sm block">Open registration</span>
-                <span className="text-neutral-500 text-[10px]">
+                <span className="text-foreground font-bold text-sm block">Open registration</span>
+                <span className="text-muted text-[10px]">
                     {isEnabled ? "Public signups allowed" : "Invite Only"}
                 </span>
             </div>
-            <button onClick={handleToggle} disabled={isPending} className={`px-4 py-1.5 text-xs font-bold border transition-none disabled:opacity-50 ${isEnabled ? 'border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black' : 'border-neutral-500 text-neutral-500 hover:border-white hover:text-white'}`}>
+            <button onClick={handleToggle} disabled={isPending} className={`px-4 py-1.5 text-xs font-bold border transition-none disabled:opacity-50 ${isEnabled ? 'border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-background' : 'border-border text-muted hover:border-foreground hover:text-foreground'}`}>
                 {isEnabled ? "Enabled" : "Disabled"}
             </button>
         </div>

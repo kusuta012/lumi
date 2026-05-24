@@ -28,18 +28,18 @@ export default async function AlbumsPage() {
         <div className="p-8">
             <header className="mb-10 flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                         <Library className="text-orange-500 w-5 h-5"/> Albums
                     </h1>
-                    <p className="text-neutral-500 text-sm mt-2">Your Collections</p>
+                    <p className="text-muted text-sm mt-2">Your Collections</p>
                 </div>
                 <CreateAlbumButton />
             </header>
 
             {userAlbums.length === 0 ? (
-                <div className="h-80 flex flex-col items-center justify-center border-2 border-dashed border-neutral-900 rounded-3xl text-neutral-500">
+                <div className="h-80 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-3xl text-muted">
                     <Library size={48} className="mb-4 opacity-10" />
-                    <p className="text-lg font-medium text-neutral-400">No albums yet !</p>
+                    <p className="text-lg font-medium text-muted">No albums yet !</p>
                     <p className="text-sm">Select photos in your gallery to create one</p>
                 </div>
             ) : (

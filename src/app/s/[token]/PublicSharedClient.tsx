@@ -46,31 +46,31 @@ export default function PublicSharedClient({ token, title, items, ownerName, all
     const goPrev = () => selectedIndex !== null && selectedIndex > 0 && setSelectedIndex(selectedIndex - 1);
 
     return (
-        <div className="bg-[#050505] min-h-screen text-neutral-200">
+        <div className="bg-background min-h-screen text-foreground">
             <div className="p-8 max-w-6xl mx-auto pb-32">
-                <header className="mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-neutral-900 pb-8">
+                <header className="mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-border pb-8">
                     <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">{title}</h1>
-                    <p className="text-neutral-500 text-xs mt-1 font-bold tracking-widest">Shared by <span className="text-orange-300" >{ownerName}</span> | <span className="text-neutral-400">{items.length} items</span></p>
+                    <h1 className="text-3xl font-black text-foreground tracking-tight">{title}</h1>
+                    <p className="text-muted text-xs mt-1 font-bold tracking-widest">Shared by <span className="text-orange-300" >{ownerName}</span> | <span className="text-muted">{items.length} items</span></p>
                     </div>
                     {allowUpload && <PublicUploadButton token={token} /> }
                 </header>
                 {items.length === 0 ? (
-                    <div className="h-64 flex flex-col items-center justify-center border border-neutral-800 border-dashed text-neutral-600 text-sm">
+                    <div className="h-64 flex flex-col items-center justify-center border border-border border-dashed text-muted text-sm">
                         No media in this shared album yet
                     </div>
                 ) : (
                     <div className="space-y-12">
                         {sortedGroups.map(([date, groupItems]: any) => (
                             <div key={date}>
-                                <h2 className="text-xs font-bold text-neutral-400 tracking-widest mb-b border-b border-neutral-900 pb-2">
+                                <h2 className="text-xs font-bold text-muted tracking-widest mb-b border-b border-border pb-2">
                                     {date}
                                 </h2>
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                                     {groupItems.map((item: any) => (
-                                        <div key={item.id} onClick={() => setSelectedIndex(items.indexOf(item))} className="relative aspect-square bg-[#0c0c0c] border border-neutral-900 overflow-hidden cursor-pointer hover:border-orange-500/50 transition-all group">
+                                        <div key={item.id} onClick={() => setSelectedIndex(items.indexOf(item))} className="relative aspect-square bg-background border border-border overflow-hidden cursor-pointer hover:border-orange-500/50 transition-all group">
                                             <img src={`/api/shared/${token}/media/${item.id}?size=small`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                            <div className="absolute inset-0 bg-background/0 group-hover:bg-background/10 transition-colors" />
                                         </div>
                                     ))}
                                 </div>
@@ -80,18 +80,18 @@ export default function PublicSharedClient({ token, title, items, ownerName, all
                 )}
             </div>
             {selectedIndex !== null && items.length > 0 && (
-                <div className="fixed inset-0 z-50 bg-black flex overflow-hidden animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-50 bg-background flex overflow-hidden animate-in fade-in duration-200">
                     <div className="flex-1 relative flex flex-col h-full overflow-hidden">
                         <div className="h-16 flex items-center justify-between px-4 bg-gradient-to-b from-black/70 to-transparent absolute w-full z-20">
-                            <button onClick={() => setSelectedIndex(null)} className="p-2 text-white/80 hover:text-white transition-colors">
+                            <button onClick={() => setSelectedIndex(null)} className="p-2 text-foreground/80 hover:text-foreground transition-colors">
                                 <X size={24} />
                             </button>
                             <div className="flex gap-2">
-                                <button onClick={() => document.documentElement.requestFullscreen()} className="p-2.5 text-white/70 hover:text-white transition-all rounded-full hover:bg-white/10">
+                                <button onClick={() => document.documentElement.requestFullscreen()} className="p-2.5 text-foreground/70 hover:text-foreground transition-all rounded-full hover:bg-background/10">
                                     <Maximize2 size={20} />
                                 </button>
                                 {allowDownload && (
-                                    <button onClick={() => handleDownload(items[selectedIndex])} className="p-2.5 text-white/70 hover:text-white transition-all rounded-full hover:bg-white/10">
+                                    <button onClick={() => handleDownload(items[selectedIndex])} className="p-2.5 text-foreground/70 hover:text-foreground transition-all rounded-full hover:bg-background/10">
                                         <Download size={20} />
                                     </button>
                                 )}
@@ -99,7 +99,7 @@ export default function PublicSharedClient({ token, title, items, ownerName, all
                         </div>
                     <div className="flex-1 relative flex items-center justify-center group">
                         {selectedIndex > 0 && (
-                            <button onClick={goPrev} className="absolute left-6 p-3 rounded-full bg-white/5 text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <button onClick={goPrev} className="absolute left-6 p-3 rounded-full bg-background/5 text-foreground hover:bg-background/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                 <ChevronLeft size={32} />
                             </button>
                         )}
@@ -109,7 +109,7 @@ export default function PublicSharedClient({ token, title, items, ownerName, all
                             <img src={`/api/shared/${token}/media/${items[selectedIndex].id}?size=large`} className="max-w-full max-h-full object-contain" alt="" />
                         )}
                         {selectedIndex < items.length - 1 && (
-                            <button onClick={goNext} className="absolute right-6 p-3 rounded-full bg-white/5 text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <button onClick={goNext} className="absolute right-6 p-3 rounded-full bg-background/5 text-foreground hover:bg-background/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                 <ChevronRight size={32} />
                             </button>
                         )}

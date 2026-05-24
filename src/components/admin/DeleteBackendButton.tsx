@@ -18,7 +18,7 @@ export default function DeleteBackendButton({ backendId }: { backendId: string }
     };
 
     return (
-        <button onClick={handleDelete} disabled={isPending} className="text-red-500 hover:text-white border border-transparent hover:border-red-500 p-1.5 transition-colors disbaled:opacity-50">
+        <button onClick={handleDelete} disabled={isPending} className="text-red-500 hover:text-foreground border border-transparent hover:border-red-500 p-1.5 transition-colors disbaled:opacity-50">
             <Trash2 size={14} />
         </button>
     )

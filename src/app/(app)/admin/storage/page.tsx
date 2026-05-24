@@ -45,19 +45,19 @@ export default async function AdminStoragePage() {
             <Link href="/admin" className="text-orange-500 hover:underline text-sm font-bold mb-6 inline-block">
                 &larr; Back to Dashboard
             </Link>
-            <h1 className="text-2xl font-black text-white tracking-tight border-b border-neutral-800 pb-4 mb-6 flex items-center gap-3">
+            <h1 className="text-2xl font-black text-foreground tracking-tight border-b border-border pb-4 mb-6 flex items-center gap-3">
                 storage manager
             </h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <div className="border border-neutral-800 bg-[#0a0a0a] pb-4">
-                    <h2 className="text-white font-bold text-sm mb-4 ">Connected drives</h2>
+                <div className="border border-border bg-background pb-4">
+                    <h2 className="text-foreground font-bold text-sm mb-4 ">Connected drives</h2>
                     <div className="space-y-3">
                         {drivesWithLiveStatus.map(b => (
-                            <div key={b.id} className={`p-4 border ${b.isDefault ? 'border-orange-500 bg-orange-500/5' : 'border-neutral-800 bg-[#111]'} flex justify-between items-center`}>
+                            <div key={b.id} className={`p-4 border ${b.isDefault ? 'border-orange-500 bg-orange-500/5' : 'border-border bg-surface'} flex justify-between items-center`}>
                             <div>
-                                <h3 className="text-white font-bold text-sm">{b.name}</h3>
-                                <p className="text-[10px] text-neutral-500 font-mono mt-1">TYPE: {b.type.toUpperCase()} | STATUS: <span className={b.isOnline ? "text-green-500" : "text-red-500"}>{b.isOnline ? "ONLINE" : "OFFLINE"}</span></p>
+                                <h3 className="text-foreground font-bold text-sm">{b.name}</h3>
+                                <p className="text-[10px] text-muted font-mono mt-1">TYPE: {b.type.toUpperCase()} | STATUS: <span className={b.isOnline ? "text-green-500" : "text-red-500"}>{b.isOnline ? "ONLINE" : "OFFLINE"}</span></p>
                             </div>
                             {b.isDefault ? (
                                 <span className="text-[10px] font-bold text-orange-500 border border-orange-500 px-2 py-1">DEFAULT</span>
@@ -72,16 +72,16 @@ export default async function AdminStoragePage() {
                     </div>
                 </div>
 
-                <div className="border border-neutral-800 bg-[#0a0a0a] p-4">
+                <div className="border border-border bg-background p-4">
                     <StorageBackendForm />
                 </div>
             </div>
-            <div className={`border-2 p-6 ${isMaintenanceMode ? 'border-red-500/50 bg-red-500/5' : 'border-neutral-800 bg-[#0a0a0a]'}`}>
-                <h2 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
+            <div className={`border-2 p-6 ${isMaintenanceMode ? 'border-red-500/50 bg-red-500/5' : 'border-border bg-background'}`}>
+                <h2 className="text-foreground font-bold text-sm mb-2 flex items-center gap-2">
                     Data migration
                 </h2>
                 {!isMaintenanceMode ? (
-                    <p className="text-sm text-neutral-500 mb-4">You must enable Maintenance mode to migrate data between drives</p>
+                    <p className="text-sm text-muted mb-4">You must enable Maintenance mode to migrate data between drives</p>
                 ) : (
                     <MigrationPanel backends={backends} />
                 )}

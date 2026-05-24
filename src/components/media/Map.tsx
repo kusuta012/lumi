@@ -58,8 +58,8 @@ export default function Map() {
                 <Marker key={photo.id} position={[photo.gpsLat, photo.gpsLng]} icon={customIcon}>
                     <Popup className="lumi-map-popup">
                         <div className="text-center p-1 flex flex-col items-center">
-                            <img src={`/api/media/${photo.id}?size=small`} onClick={() => setSelectedIndex(photos.indexOf(photo))} className="w-24 h-24 object-cover rounded-lg border border-neutral-800 mb-2 shadow-md cursor-pointer" alt={photo.filename} />
-                            <p className="text-xs font-bold text-neutral-800 truncate max-w-[120px]">
+                            <img src={`/api/media/${photo.id}?size=small`} onClick={() => setSelectedIndex(photos.indexOf(photo))} className="w-24 h-24 object-cover rounded-lg border border-border mb-2 shadow-md cursor-pointer" alt={photo.filename} />
+                            <p className="text-xs font-bold text-neutral-900 truncate max-w-[120px]">
                                 {photo.filename}
                             </p>
                         </div>

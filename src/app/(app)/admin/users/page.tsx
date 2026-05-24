@@ -19,16 +19,16 @@ export default async function AdminUsersPage() {
 
     return (
         <div className="p-6 max-w-6xl mx-auto">
-            <Link href="/admin" className="text-white hover:underline text-sm font-bold mb-6 inline-block">
+            <Link href="/admin" className="text-foreground hover:underline text-sm font-bold mb-6 inline-block">
                 &larr; Back to Dashboard
             </Link>
-            <h1 className="text-2xl font-black text-white tracking-tight border-b border-neutral-800 pb-4 mb-6">
+            <h1 className="text-2xl font-black text-foreground tracking-tight border-b border-border pb-4 mb-6">
                 User managment
             </h1>
             <div className="flex flex-col lg:flex-row gap-6">
                 <GlobalQuotaManger />
-                <div className="lg:w-2/3 border border-neutral-800 bg-[#0a0a0a] p-4">
-                    <h2 className="text-white font-bold text-sm mb-4">Current users</h2>
+                <div className="lg:w-2/3 border border-border bg-background p-4">
+                    <h2 className="text-foreground font-bold text-sm mb-4">Current users</h2>
                     <UserManagementTable users={allUsers} />
                 </div>
             </div>

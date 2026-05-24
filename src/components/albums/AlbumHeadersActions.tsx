@@ -38,13 +38,13 @@ export default function AlbumHeadersAction({ album }: { album: any }) {
     return (
         <>
             <div className="flex items-center gap-2 pb-1">
-                <button onClick={() => setIsEditModalOpen(true)} disabled={isPending} className="p-2 hover:bg-neutral-800 rounded-full text-neutral-400 hover:text-white transition-colors disabled:opacity-50">
+                <button onClick={() => setIsEditModalOpen(true)} disabled={isPending} className="p-2 hover:bg-surface-hover rounded-full text-muted hover:text-foreground transition-colors disabled:opacity-50">
                     <Edit size={20} />
                 </button>
-                <button onClick={handleDownload} className="p-2 hover:bg-neutral-800 rounded-full text-neutral-400 hover:text-white transition-colors disabled:opacity-50">
+                <button onClick={handleDownload} className="p-2 hover:bg-surface-hover rounded-full text-muted hover:text-foreground transition-colors disabled:opacity-50">
                     <Download size={16} /> 
                 </button>
-                <button onClick={handleDelete} disabled={isPending} className="p-2 hover:bg-red-950/30 rounded-full text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50">
+                <button onClick={handleDelete} disabled={isPending} className="p-2 hover:bg-red-950/30 rounded-full text-muted hover:text-red-500 transition-colors disabled:opacity-50">
                     <Trash2 size={20} />
                 </button>
             </div>

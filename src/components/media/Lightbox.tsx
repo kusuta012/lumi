@@ -165,10 +165,10 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
 
     if (!item) return null;
     return (
-        <div className="fixed inset-0 z-[999999] bg-black flex overflow-hidden animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[999999] bg-background flex overflow-hidden animate-in fade-in duration-200">
             <div className="flex-1 relative flex flex-col h-full overflow-hidden">
                 <div className="h-16 flex items-center justify-between px-4 bg-gradient-to-b from-black/70 to-transparent absolute top-0 w-full z-20">
-                    <button onClick={onClose} className="p-2 text-white/80 hover:text-white transition-colors">
+                    <button onClick={onClose} className="p-2 text-foreground/80 hover:text-foreground transition-colors">
                         <X size={24} />
                     </button>
 
@@ -219,7 +219,7 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                 </div>
                 <div className="flex-1 relative flex items-center justify-center group">
                     {index > 0 && (
-                        <button onClick={goPrev} className="absolute left-6 p-3 rounded-full bg-white/5 text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <button onClick={goPrev} className="absolute left-6 p-3 rounded-full bg-background/5 text-foreground hover:bg-background/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                             <ChevronLeft size={32} />
                         </button>
                     )}
@@ -236,17 +236,17 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                     )}
 
                     {index < items.length - 1 && (
-                        <button onClick={goNext} className="absolute right-6 p-3 rounded-full bg-white/5 text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <button onClick={goNext} className="absolute right-6 p-3 rounded-full bg-background/5 text-foreground hover:bg-background/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                             <ChevronRight size={32} />
                         </button>
                     )}
                 </div>
             </div>
             {showInfo && (
-                <div className="w-80 bg-[#0d0d0d] border-l border-neutral-800 p-6 flex flex-col h-full animate-in slide-in-from-right duration-300 z-30 overflow-y-auto">
+                <div className="w-80 bg-surface border-l border-border p-6 flex flex-col h-full animate-in slide-in-from-right duration-300 z-30 overflow-y-auto">
                     <div className="flex justify-between items-center mb-8">
-                        <h2 className="text-xl font-bold text-white">Info</h2>
-                        <button onClick={() => setShowInfo(false)} className="text-neutral-500 hover:text-white">
+                        <h2 className="text-xl font-bold text-foreground">Info</h2>
+                        <button onClick={() => setShowInfo(false)} className="text-muted hover:text-foreground">
                             <X size={20} />
                         </button>
                     </div>
@@ -274,7 +274,7 @@ function IconButton({ icon, onClick, active = false, className = "", disabled = 
         <button
             onClick={onClick}
             disabled={disabled}
-            className={`p-2.5 rounded-full transition-all active:scale-90 ${active ? "bg-white/20 text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+            className={`p-2.5 rounded-full transition-all active:scale-90 ${active ? "bg-background/20 text-foreground" : "text-foreground/70 hover:bg-background/10 hover:text-foreground"
                 } ${className} disabled:opacity-50`}
         >
             {icon}
@@ -285,11 +285,11 @@ function IconButton({ icon, onClick, active = false, className = "", disabled = 
 function DetailSection({ icon, label, value, sub }: any) {
     return (
         <div className="flex gap-4">
-            <div className="mt-1 text-neutral-500 shrink-0">{icon}</div>
+            <div className="mt-1 text-muted shrink-0">{icon}</div>
             <div>
-                <p className="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mb-1">{label}</p>
-                <p className="text-sm text-neutral-200 leading-snug">{value}</p>
-                {sub && <p className="text-[10px] text-neutral-500 mt-1.5">{sub}</p>}
+                <p className="text-[10px] text-muted uppercase font-bold tracking-widest mb-1">{label}</p>
+                <p className="text-sm text-foreground leading-snug">{value}</p>
+                {sub && <p className="text-[10px] text-muted mt-1.5">{sub}</p>}
             </div>
         </div>
     );

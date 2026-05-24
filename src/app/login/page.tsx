@@ -8,22 +8,22 @@ export default function LoginPage() {
     const [state, formAction, isPending] = useActionState<LoginState, FormData>(loginAction, null);
 
     return (
-        <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-8 shadow-2xl">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+            <div className="w-full max-w-md bg-surface border border-border rounded-2xl p-8 shadow-2xl">
                 <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-bold text-neutral-100 mb-2">Lumi</h1>
-                    <p className="text-neutral-400 text-sm">Sign in</p>
+                    <h1 className="text-3xl font-bold text-foreground mb-2">Lumi</h1>
+                    <p className="text-muted text-sm">Sign in</p>
                 </div>
                 
                 <form action={formAction} className="space-y-5">
                     <div>
-                        <label className="block text-sm font-medium text-neutral-300 mb-1.5">Username</label>
-                        <input name="username" type="text" required className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2.5 text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"></input>
+                        <label className="block text-sm font-medium text-foreground mb-1.5">Username</label>
+                        <input name="username" type="text" required className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-foreground focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"></input>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-neutral-300 mb-1.5">Password</label>
-                        <input name="password" type="password" required minLength={8} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2.5 text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"></input>
+                        <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
+                        <input name="password" type="password" required minLength={8} className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-foreground focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"></input>
                     </div>
 
                     {state?.error && (
@@ -32,10 +32,10 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    <button type="submit" disabled={isPending} className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-lg transition-colors mt-4">{isPending ? "Signing in...": "Sign in"}</button>
+                    <button type="submit" disabled={isPending} className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-foreground font-medium py-2.5 px-4 rounded-lg transition-colors mt-4">{isPending ? "Signing in...": "Sign in"}</button>
                 </form>
 
-                <div className="mt-6 text-center text-sm text-neutral-500 font-medium">
+                <div className="mt-6 text-center text-sm text-muted font-medium">
                     Don't Have an account?{" "}
                     <Link href="/register" className="text-orange-500 hover:underline transition-all">Sign Up</Link>
                 </div>

@@ -73,7 +73,7 @@ export default function UploadButton() {
             
 
     return (
-        <label className="flex items-center gap-2 px-4 py-1.5 bg-transparent hover:bg-neutral-800 border-neutral-700 text-neutral-300 rounded-full cursor-pointer transition-all text-sm font-medium disabled:opacity-50">
+        <label className="flex items-center gap-2 px-4 py-1.5 bg-transparent hover:bg-surface-hover border-border text-foreground rounded-full cursor-pointer transition-all text-sm font-medium disabled:opacity-50">
             <UploadCloud className="w-4 h-4"></UploadCloud>
             {loading ? progress : "Upload"}
             <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={onFileSelect} disabled={loading} />

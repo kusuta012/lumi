@@ -17,10 +17,10 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
 
     if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
         return (
-            <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-white">
+            <div className="min-h-screen bg-background flex items-center justify-center text-foreground">
                 <div className="text-center space-y-4">
-                    <h1 className="text-4xl font-bold text-neutral-600">Link Expired</h1>
-                    <p className="text-neutral-400">This shared link is o longer active</p>
+                    <h1 className="text-4xl font-bold text-muted">Link Expired</h1>
+                    <p className="text-muted">This shared link is o longer active</p>
                 </div>
             </div>
         );
@@ -73,7 +73,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a]">
+        <div className="min-h-screen bg-background">
             <PublicSharedClient token={token} title={title} items={items} ownerName = {owner?.username || "Unknown user"} allowDownload = {link.allowDownload!} allowUpload = {link.allowUpload!} />
         </div>
     );

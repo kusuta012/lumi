@@ -20,9 +20,9 @@ export default async function ArchivePage() {
 
     return (
         <div>
-            <div className="px-6 py-8 border-b border-neutral-900">
-                <h1 className="text-2xl font-bold text-white">Archive</h1>
-                <p className="text-sm text-neutral-500 mt-1">
+            <div className="px-6 py-8 border-b border-border">
+                <h1 className="text-2xl font-bold text-foreground">Archive</h1>
+                <p className="text-sm text-muted mt-1">
                     {items.length} archived {items.length === 1 ? 'item' : 'items'}
                 </p>
             </div>

@@ -60,7 +60,7 @@ export default function PublicUploadButton({ token }: { token: string }) {
     };
 
     return (
-        <label className="flex items-center gap-2 px-4 py-2 bg-transparent hover:bg-neutral-900 border border-neutral-800 text-neutral-300 rounded-lg cursor-pointer transition-colors text-xs font-bold tracking-wider">
+        <label className="flex items-center gap-2 px-4 py-2 bg-transparent hover:bg-surface border border-border text-foreground rounded-lg cursor-pointer transition-colors text-xs font-bold tracking-wider">
             <UploadCloud className="w-4 h-4 text-orange-500" />
             {loading ? progress : "Upload"}
             <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={onFileSelect} disabled={loading} />

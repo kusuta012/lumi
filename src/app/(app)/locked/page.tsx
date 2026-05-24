@@ -17,7 +17,7 @@ export default async function LockedFolderPage() {
 
     if (!isUnlocked || !hasPin) {
         return (
-            <div className="min-h-[85vh] flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black">
+            <div className="min-h-[85vh] flex flex-col items-center justify-center p-4 relative overflow-hidden bg-background">
                 <UnlockLockedFolder needsSetup={!hasPin} />
             </div>
         );
@@ -38,8 +38,8 @@ export default async function LockedFolderPage() {
 
     return (
         <div>
-            <div className="px-6 py-8 border-b border-neutral-900">
-                <h1 className="text-2xl font-bold text-white tracking-wider">Locked Folder</h1>
+            <div className="px-6 py-8 border-b border-border">
+                <h1 className="text-2xl font-bold text-foreground tracking-wider">Locked Folder</h1>
             </div>
             <TimelineGallery initialMedia={lockedItems as any} startYear={startYear} endYear={endYear} emptyMessage="Your secure folder is empty" isLockedPage={true} />
         </div>

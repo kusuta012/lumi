@@ -19,9 +19,9 @@ export default async function TrashPage() {
 
     return (
         <div>
-            <div className="px-6 py-8 border-b border-neutral-900">
-                <h1 className="text-2xl font-bold text-white">Trash</h1>
-                <p className="text-sm text-neutral-500 mt-1">Items here will be permanently deleted after 30 days</p>
+            <div className="px-6 py-8 border-b border-border">
+                <h1 className="text-2xl font-bold text-foreground">Trash</h1>
+                <p className="text-sm text-muted mt-1">Items here will be permanently deleted after 30 days</p>
             </div>
             <TimelineGallery initialMedia={items as any} startYear={startYear} endYear={endYear} emptyMessage="Trash is empty" isTrashPage={true} / >
         </div>

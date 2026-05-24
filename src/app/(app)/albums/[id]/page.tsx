@@ -49,10 +49,10 @@ export default async function AlbumDetailPage({ params }: { params: Promise<{ id
 
     return (
         <div>
-            <div className="px-8 py-10 border-b border-neutral-900 flex justify-between items-end">
+            <div className="px-8 py-10 border-b border-border flex justify-between items-end">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">{album.name}</h1>
-                    <p className="text-neutral-500 text-sm mt-1">{albumPhotos.length} items</p>
+                    <h1 className="text-3xl font-bold text-foreground">{album.name}</h1>
+                    <p className="text-muted text-sm mt-1">{albumPhotos.length} items</p>
                 </div>
                 {isOwner && <AlbumHeadersAction album={album} />}
             </div>
