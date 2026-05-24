@@ -42,11 +42,11 @@ export default async function AdminStoragePage() {
 
     return (
         <div className="p-6 max-w-6xl mx-auto">
-            <Link href="/admin" className="text-orange-500 hover:underline text-sm font-bold mb-6 inline-block">
+            <Link href="/admin" className="text-foreground hover:underline text-sm font-bold mb-6 inline-block">
                 &larr; Back to Dashboard
             </Link>
-            <h1 className="text-2xl font-black text-foreground tracking-tight border-b border-border pb-4 mb-6 flex items-center gap-3">
-                storage manager
+            <h1 className="text-2xl font-black text-foreground tracking-tight border-b border-border pb-4 mb-6">
+                Storage Manager
             </h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

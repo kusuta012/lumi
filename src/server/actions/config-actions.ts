@@ -5,6 +5,7 @@ import { platformConfig } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { logAuditEvent } from "@/lib/audit";
 
 export async function getRegistrationSetting() {
     const setting = await db.query.platformConfig.findFirst({
@@ -24,6 +25,12 @@ export async function toggleRegistrationAction(currentStatus: boolean) {
         .values({ key: 'allow_registration', value: newValue })
         .onConflictDoUpdate({ target: [platformConfig.key], set: { value: newValue, updatedAt: new Date() }
         });
+    await logAuditEvent(
+        "registration_toggle",
+        "config",
+        "allow_registration",
+        { enabled: newValue }
+    );
     revalidatePath("/admin");
     revalidatePath("/login");
     revalidatePath("/register");

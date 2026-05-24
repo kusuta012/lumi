@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { mediaQueue } from "@/lib/queue";
 import { redisCache } from "@/lib/cache";
+import { logAuditEvent } from "@/lib/audit";
 
 export async function addToAlbumAction(mediaIds: string[], albumName: string) {
     const session = await auth();
@@ -83,11 +84,18 @@ export async function deleteAlbumAction(albumId: string) {
     if (!session?.user?.id) throw new Error("Unauthorized");
 
     try {
+        const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
         await db.transaction(async (tx) => {
             await tx.delete(albumMedia).where(eq(albumMedia.albumId, albumId));
             await tx.delete(albums).where(and(eq(albums.id, albumId), eq(albums.ownerId, session.user.id)));
         });
         await redisCache.del(`user_album_grid:${session.user.id}`);
+        await logAuditEvent(
+            "album_deleted",
+            "album",
+            albumId,
+            { name: album?.name || "Unknown" }
+        );
         revalidatePath("/albums", "layout");
         return { success: true };
     } catch (error) {

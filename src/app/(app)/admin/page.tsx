@@ -8,6 +8,7 @@ import Link from "next/link";
 import os from "os";
 import { getMaintenanceSetting } from "@/server/actions/storage-actions";
 import MaintenanceToggle from "@/components/admin/MaintenanceToggle";
+import { cacheRedis } from "@/lib/cache";
 
 async function checkDatabase() {
     try {
@@ -22,6 +23,15 @@ async function checkMinIO() {
     try {
         await minioClient.bucketExists(BUCKET_NAME);
         return { status: "ONLINE", color: "text-green-500" };
+    } catch {
+        return { status: "OFFLINE", color: "text-red-500" };
+    }
+}
+
+async function checkRedis() {
+    try {
+        const pong = await cacheRedis.ping();
+        return pong === "PONG" ? { status: "ONLINE", color: "text-green-500" } : { status: "DEGRADED", color: "text-red-500" };
     } catch {
         return { status: "OFFLINE", color: "text-red-500" };
     }
@@ -49,6 +59,7 @@ export default async function AdminPage() {
     const storageUsedGB = mediaResult.totalBytes ? (Number(mediaResult.totalBytes) / 1024 / 1024 /1024).toFixed(2) : "0.00";
     const dbHealth = await checkDatabase();
     const minioHealth = await checkMinIO();
+    const redisHealth = await checkRedis();
 
     return (
         <div className="p-6 max-w-6xl mx-auto font-sans">
@@ -94,7 +105,7 @@ export default async function AdminPage() {
                                     </tr>
                                     <tr className="border-t border-border">
                                         <td className="py-1.5">Redis workers</td>
-                                        {/* <td className={`py-1.5 text-right font-medium ${dbHealth.color}`}>{dbHealth.status}</td> */}
+                                        <td className={`py-1.5 text-right font-medium ${redisHealth.color}`}>{redisHealth.status}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -107,13 +118,6 @@ export default async function AdminPage() {
                         <div className="space-y-4">
                             <RegistrationToggle isEnabled={allowReg} />
                             <MaintenanceToggle isEnabled={isMaintenance} />
-                            <div className="flex items-center justify-between p-3 opacity-50">
-                                <div>
-                                    <span className="text-foreground font-bold text-sm block">Maintenance Mode</span>
-                                    <span className="text-muted text-xs">Lock server to admins only</span>
-                                </div>
-                                <div className="w-10 h-5 bg-surface-hover rounded-sm"></div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -128,8 +132,8 @@ export default async function AdminPage() {
                 <Link href="/admin/users" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
                     WORKER QUEUES
                 </Link>
-                <Link href="/admin/users" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
-                    SYSTEM LOGS
+                <Link href="/admin/audit" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
+                    AUDIT LOGS
                 </Link>
             </div>
         </div>

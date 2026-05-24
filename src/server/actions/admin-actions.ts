@@ -6,6 +6,7 @@ import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { redisCache } from "@/lib/cache";
+import { logAuditEvent } from "@/lib/audit";
 
 async function ensureSuperAdmin() {
     const session = await auth();
@@ -35,6 +36,11 @@ export async function toggleUserStatus(userId: string, currentSuspension: boolea
             await redisCache.del(`revoked_session:${userId}`);
         }
 
+        await logAuditEvent(
+            currentSuspension ? "user_unsuspended" : "user_suspended",
+            "user",
+            userId
+        );
         revalidatePath("/admin/users");
         return { success: true };
     } catch (error) {

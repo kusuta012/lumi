@@ -5,7 +5,6 @@ import { desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import UserManagementTable from "@/components/admin/UserManagementTable";
-import { GlobalLayoutRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import GlobalQuotaManger from "../../../../components/admin/GlobalQuotaManager";
 
 export default async function AdminUsersPage() {
@@ -23,7 +22,7 @@ export default async function AdminUsersPage() {
                 &larr; Back to Dashboard
             </Link>
             <h1 className="text-2xl font-black text-foreground tracking-tight border-b border-border pb-4 mb-6">
-                User managment
+                User Management
             </h1>
             <div className="flex flex-col lg:flex-row gap-6">
                 <GlobalQuotaManger />

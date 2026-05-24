@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Lightbox from "./Lightbox"
+import { useTheme } from "next-themes";
 
 const customIcon = L.divIcon({
     html: `
@@ -27,6 +28,7 @@ interface LocatedPhoto {
 }
 
 export default function Map() {
+    const { resolvedTheme } = useTheme();
     const [photos, setPhotos] = useState<LocatedPhoto[]>([]);
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -49,10 +51,12 @@ export default function Map() {
             });
     }, []);
 
+    const tileUrl = resolvedTheme === "dark" ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+
     return (
         <div className="h-full w-full relative">
-        <MapContainer center={[20, 0]} zoom={2} minZoom={2} maxBounds={[[-90, -180], [90, 180]]} className="h-full w-full" style={{ background: "#0a0a0a" }}>
-            <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+        <MapContainer center={[20, 0]} zoom={2} minZoom={2} maxBounds={[[-90, -180], [90, 180]]} className="h-full w-full" style={{ background: "var(--background)"}}>
+            <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url={tileUrl} />
 
             {photos && Array.isArray(photos) && photos.map((photo) => (
                 <Marker key={photo.id} position={[photo.gpsLat, photo.gpsLng]} icon={customIcon}>
