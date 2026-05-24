@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
+    "@tanstack/react-virtual": "^3.13.25",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.76.8",
     "clsx": "^2.1.1",
@@ -33,6 +34,7 @@
     "postgres": "^3.4.9",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-intersection-observer": "^10.0.3",
     "react-leaflet": "^5.0.0",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.6.0"

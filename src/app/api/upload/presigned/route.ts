@@ -3,7 +3,15 @@ import { auth } from '@/server/auth';
 import { getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
 import { users, storageBackends } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+
+const prepUserCheck = db.select({
+    storageUsed: users.storageUsed,
+    storageQuota: users.storageQuota
+})
+.from(users)
+.where(eq(users.id, sql.placeholder("userId")))
+.prepare("user_quota_check")
 
 export async function POST(req: Request) {
     const session = await auth();
@@ -14,10 +22,8 @@ export async function POST(req: Request) {
         if (!contentType?.startsWith("image/") && !contentType?.startsWith("video/")) {
             return NextResponse.json({ error: "invalid file type. Only images and video are allowed."}, { status: 400 });
         }
-        const user = await db.query.users.findFirst({
-            where: eq(users.id, session.user.id),
-            columns: { storageUsed: true, storageQuota: true }
-        });
+       
+        const [user] = await prepUserCheck.execute({ userId: session.user.id });
 
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 

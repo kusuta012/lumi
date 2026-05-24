@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { media, albums, albumMedia, albumContributors } from "@/db/schema"
 import { eq, and, sql } from "drizzle-orm";
 import { getStorageClient } from "@/lib/storage";
+import { redisCache } from "@/lib/cache";
 
 export async function GET(
     req: NextRequest, 
@@ -16,12 +17,19 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const size = searchParams.get("size") || "original";
 
-    const item = await db.query.media.findFirst({
-        where: eq(media.id, id),
-        with: { storageBackend: true }
-    });
-    const { client, bucket } = getStorageClient(item?.storageBackend?.config);
+    const cacheKey = `media_meta:${id}`;
+    let item = await redisCache.get(cacheKey);
+    if (!item) {
+        item = await db.query.media.findFirst({
+            where: eq(media.id, id),
+            with: { storageBackend: true }
+        });
 
+        if (item) {
+            await redisCache.set(cacheKey, item, 86400);
+        }
+    }
+    
     if (!item) return new NextResponse("Not found", { status: 404 })
     const isOwner = item.ownerId === session.user.id;
     let hasSharedAccess = false;
@@ -41,7 +49,7 @@ export async function GET(
     }
 
     try {
-        const { client, bucket } = getStorageClient(item.storageBackend?.config);
+        const { client, bucket } = getStorageClient(item.storageBackend?.config, item.storageBackendId);
         let objectKey = item.objectKey;
         if (size !== "original" && item.thumbnails) {
             const thumbs = item.thumbnails as Record<string, string>;

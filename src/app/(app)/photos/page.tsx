@@ -20,6 +20,7 @@ export default async function PhotosPage() {
                 eq(media.isLocked, false)
             ),
             orderBy: [desc(media.dateTaken), desc(media.createdAt)],
+            limit: 50,
         });
         await redisCache.set(cacheKey, userMedia, 3600);
     } else {

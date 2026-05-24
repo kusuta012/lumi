@@ -1,6 +1,5 @@
 import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, real, primaryKey, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { permission } from 'node:process';
 
 
 export const users = pgTable('users', {
@@ -91,7 +90,11 @@ export const media = pgTable('media', {
     isLocked: boolean('is_locked').default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
-}, (table) => [index('media_owner_idx').on(table.ownerId), index('media_date_taken_idx').on(table.dateTaken)]);
+}, (table) => [
+    index('media_timeline_idx').on(table.ownerId, table.isDeleted, table.isArchived, table.isLocked),
+    index('media_date_idx').on(table.dateTaken, table.createdAt),
+    index('media_hash_idx').on(table.hash)
+]);
 
 export const albums = pgTable('albums', {
     id: uuid('id').defaultRandom().primaryKey(),

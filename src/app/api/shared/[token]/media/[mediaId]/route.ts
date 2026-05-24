@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { shareLinks, albumMedia, media } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getStorageClient } from "@/lib/storage";
+import { redisCache } from "@/lib/cache";
 
 export async function GET(
     req: NextRequest,
@@ -27,15 +28,24 @@ export async function GET(
         });
         if (!inAlbum) return new NextResponse("Unauthorized", { status: 401 });
     }
-    const item = await db.query.media.findFirst({
-        where: eq(media.id, mediaId),
-        with: { storageBackend: true }
-    });
+
+    const cacheKey = `media_meta:${mediaId}`;
+    let item = await redisCache.get(cacheKey);
+
+    if (!item) {
+        item = await db.query.media.findFirst({
+            where: eq(media.id, mediaId),
+            with: { storageBackend: true }
+        });
+        if (item) {
+            await redisCache.set(cacheKey, item, 86400);
+        }
+    }
 
     if (!item) return new NextResponse("Not found", { status: 404 });
 
     try {
-        const { client, bucket } = getStorageClient(item.storageBackend?.config);
+        const { client, bucket } = getStorageClient(item.storageBackend?.config, item.storageBackendId);
         let objectKey = item.objectKey;
 
         if (size !== "original" && item.thumbnails) {

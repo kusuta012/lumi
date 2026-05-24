@@ -98,8 +98,11 @@ export async function deletePermanentlyAction(mediaIds: string[]) {
   const verifiedIds = items.map(i => i.id);
   const result = await purgeMediaItemsSys(verifiedIds, session.user.id);
   if (result.success) {
-    await redisCache.del(`user_photos_timelime:${session.user.id}`);
+    await redisCache.del(`user_photos_timeline:${session.user.id}`);
     await redisCache.del(`user_locations:${session.user.id}`);
+    for (const id of verifiedIds) {
+      await redisCache.del(`media_meta:${id}`)
+    }
   }
 
   return result;

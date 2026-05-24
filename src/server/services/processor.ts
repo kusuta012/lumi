@@ -15,6 +15,9 @@ import os from "os";
 import { redisCache } from "@/lib/cache";
 import crypto from "crypto";
 
+sharp.concurrency(2);
+sharp.cache({ items: 50, memory: 100 });
+
 function dmsToDecimal(dms: number[] | undefined, ref: string | undefined): number | null {
   if (!dms || dms.length < 3) return null;
 
@@ -134,6 +137,7 @@ export async function processMediaItem(mediaId: string) {
           "-vframes",
           "1",
           "-an",
+          '-threads', '2',
           "-f",
           "image2",
           "-c:v",
