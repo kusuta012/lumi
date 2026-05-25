@@ -227,6 +227,7 @@ export async function processMediaItem(mediaId: string) {
     let blurScore: number | null = null;
     let aiTags: string[] = [];
     let detectedFaces: any[] = [];
+    let extractedText: string | null = null;
 
     try {
         const formData = new FormData();
@@ -244,6 +245,7 @@ export async function processMediaItem(mediaId: string) {
           blurScore = aiData.blurScore;
           aiTags = aiData.tags || [];
           detectedFaces = aiData.faces || [];
+          extractedText = aiData.extractedText || null;
         } else {
             console.error("AI analysis failed", aiResp.status);
         }
@@ -264,7 +266,8 @@ export async function processMediaItem(mediaId: string) {
         gpsLng,
         hash: fileHash,
         clipEmbedding,
-        blurScore
+        blurScore,
+        extractedText
       })
       .where(eq(media.id, item.id));
 

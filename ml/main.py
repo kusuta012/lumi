@@ -10,6 +10,7 @@ import io
 import torch
 from transformers import CLIPProcessor, CLIPModel, ViTImageProcessor, ViTForImageClassification
 from facenet_pytorch import MTCNN, InceptionResnetV1
+import easyocr
 
 
 app = FastAPI(title="Lumi")
@@ -25,6 +26,8 @@ resnet = InceptionResnetV1(pretrained='vggface2').eval().to(device)
 
 vit_processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
 vit_model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224').to(device)
+
+reader = easyocr.Reader(['en'], gpu=torch.cuda.is_available())
 
 print("ai models loaded")
 
@@ -107,12 +110,16 @@ async def analyze_image(file: UploadFile = File(...)):
                             "boundingBox": {"x": float(x1), "y": float(y1), "w": float(x2 - x1), "h": float(y2 - y1)},
                             "embedding": embeddings[i].cpu().numpy().tolist()
                         })
+        
+        ocr_results = reader.readtext(cv_image, detail=0)
+        extracted_text = " ".join(ocr_results)
 
         return {
             "blurScore": float(blur_score),
             "clipEmbedding": clip_embedding,
             "tags": list(set(tags)),
-            "faces": faces_data
+            "faces": faces_data,
+            "extractedText": extracted_text
         }
     except Exception as e:
         print(f"analysis failed {e}")

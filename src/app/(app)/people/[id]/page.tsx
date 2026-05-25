@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, exists } from "drizzle-orm";
 import { media, faces, people } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { User } from "lucide-react";
@@ -35,14 +35,26 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
         height: media.height
     })
     .from(media)
-    .innerJoin(faces, eq(faces.mediaId, media.id))
     .where(and(
         eq(faces.personId, personId),
         eq(media.isDeleted, false),
-        eq(media.isLocked, false)
+        eq(media.isLocked, false),
+        exists(
+            db.select()
+                .from(faces)
+                .where(and(
+                    eq(faces.mediaId, media.id),
+                    eq(faces.personId, personId)
+                ))
+        )
     ))
     .orderBy(desc(media.dateTaken), desc(media.createdAt));
-    const intialMedia = dbMedia.map(m => ({
+
+    const uniqueMedia = dbMedia.filter((value, index, self) =>
+        self.findIndex(m => m.id === value.id) === index
+    );
+
+    const intialMedia = uniqueMedia.map(m => ({
         ...m,
         dateTaken: m.dateTaken ? new Date(m.dateTaken) : null,
         createdAt: new Date(m.createdAt),

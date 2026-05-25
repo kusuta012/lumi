@@ -101,6 +101,7 @@ export const media = pgTable('media', {
     isLocked: boolean('is_locked').default(false),
     blurScore: real('blue_score'),
     clipEmbedding: vector('clip_embedding'),
+    extractedText: text('extracted_text'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
 }, (table) => [

@@ -31,12 +31,13 @@ interface Props {
     emptyMessage?: string;
     isTrashPage?: boolean;
     isLockedPage?: boolean;
+    isSearchPage?: boolean;
     albumId?: string;
     isOwner?: boolean;
     allowDownload?: boolean;
 }
 
-export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false,  isLockedPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
+export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false,  isLockedPage = false, isSearchPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
     const { notify } = useNotification();
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -46,7 +47,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     const isSelectionMode = selectedIds.length > 0;
     const [mediaItems, setMediaItems] = useState<MediaItem[]>(initialMedia);
     const [cursor, setCursor] = useState<string | null>(
-        initialMedia.length === 50 ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null
+        initialMedia.length === 50 && !isSearchPage ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null
     )
     const [hasMore, setHasMore] = useState(initialMedia.length >= 50);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -56,7 +57,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     
 
     const loadMorePhotos = useCallback(async () => {
-        if (isLoadingMore || !hasMore || isTrashPage || isLockedPage || albumId || !cursor) return;
+        if (isLoadingMore || !hasMore || isTrashPage || isLockedPage || isSearchPage || albumId || !cursor) return;
         setIsLoadingMore(true);
         try {
             const res = await fetch(`/api/photos/timeline?cursor=${cursor}`);
@@ -101,9 +102,9 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
 
     useEffect(() => {
         setMediaItems(initialMedia);
-        setCursor(initialMedia.length >= 50 ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null);
-        setHasMore(initialMedia.length >= 50);
-    }, [initialMedia]);
+        setCursor(initialMedia.length >= 50 && !isSearchPage ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null);
+        setHasMore(initialMedia.length >= 50 && !isSearchPage);
+    }, [initialMedia, isSearchPage]);
 
     const groupedMedia = mediaItems.reduce<Record<string, MediaItem[]>>((acc, item) => {
         const d = item.dateTaken ? new Date(item.dateTaken) : new Date(item.createdAt);
@@ -252,7 +253,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                 </div>
             )}
 
-            {cursor && !isTrashPage && !isLockedPage && !albumId && (
+            {cursor && !isTrashPage && !isLockedPage && !isSearchPage && !albumId && (
                 <div ref={loadMoreRef} className="h-20 w-full flex items-center justify-center mt-8">
                     <span className="text-xs text-muted animate-pulse font-bold tracking-widest">
                         Loading More...

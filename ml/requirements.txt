@@ -9,3 +9,4 @@ facenet-pytorch
 pydantic
 requests
 python-multipart
+easyocr
