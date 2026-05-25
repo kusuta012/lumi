@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+torch
+torchvision
+transformers
+opencv-python-headless
+Pillow
+facenet-pytorch
+pydantic
+requests
+python-multipart

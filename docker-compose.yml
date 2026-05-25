@@ -1,7 +1,7 @@
 name: lumi-dev
 services:
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     ports:
      - "5432:5432"
     environment:
@@ -30,7 +30,17 @@ services:
     volumes:
       - minio_data:/data
 
+  ml:
+    build:
+      context: ./ml
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  huggingface_cache:

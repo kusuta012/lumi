@@ -1,6 +1,17 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, real, primaryKey, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, real, primaryKey, index, customType } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
+const vector = customType<{ data: number[]; driverData: string }>({
+    dataType() {
+        return 'vector(512)';
+    },
+    toDriver(value: number[]) {
+        return `[${value.join(',')}]`;
+    },
+    fromDriver(value: string) {
+        return JSON.parse(value);
+    }
+});
 
 export const users = pgTable('users', {
     id: uuid('id').defaultRandom().primaryKey(),
@@ -88,6 +99,8 @@ export const media = pgTable('media', {
     isDeleted: boolean('is_deleted').default(false),
     isEncrypted: boolean('is_encrypted').default(true),
     isLocked: boolean('is_locked').default(false),
+    blurScore: real('blue_score'),
+    clipEmbedding: vector('clip_embedding'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
 }, (table) => [
@@ -173,4 +186,37 @@ export const albumRelations = relations(albums, ({ one, many }) => ({
     owner: one(users, { fields: [albums.ownerId], references: [users.id] }),
     media: many(albumMedia),
     contributors: many(albumContributors),
+}));
+
+export const people = pgTable('people', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    name: text('name').notNull(),
+    coverFaceId: uuid('cover_face_id'),
+    isHidden: boolean('is_hidden').default(false),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export const faces = pgTable('faces', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    mediaId: uuid('media_id').references(() => media.id, { onDelete: 'cascade' }).notNull(),
+    personId: uuid('person_id').references(() => people.id, { onDelete: 'set null' }), //todo
+    boundingBox: jsonb('bounding_box').notNull().$type<{
+        x: number; y: number; w: number; h: number;
+    }>(),
+    faceEmbedding: vector('face_embedding'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+    index('faces_media_idx').on(table.mediaId),
+    index('faces_person_idx').on(table.personId)
+]);
+
+export const peopleRelations = relations(people, ({ one, many }) => ({
+    owner: one(users, { fields: [people.ownerId], references: [users.id] }),
+    faces: many(faces),
+}));
+
+export const facesRelations = relations(faces, ({ one }) => ({
+    media: one(media, { fields: [faces.mediaId], references: [media.id] }),
+    person: one(people, { fields: [faces.personId], references: [people.id] }),
 }));

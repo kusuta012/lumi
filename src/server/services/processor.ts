@@ -6,7 +6,7 @@ import { path as ffprobePath } from "ffprobe-static";
 import exifReader from "exif-reader";
 import { BUCKET_NAME, getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
-import { media, users } from "@/db/schema";
+import { faces, media, mediaTags, tags, users, people } from "@/db/schema";
 import { eq, sql, and, ne } from "drizzle-orm";
 import fs from "fs/promises";
 import { createReadStream } from "fs";
@@ -14,6 +14,7 @@ import path from "path";
 import os from "os";
 import { redisCache } from "@/lib/cache";
 import crypto from "crypto";
+import { env } from "@/lib/env"
 
 sharp.concurrency(2);
 sharp.cache({ items: 50, memory: 100 });
@@ -222,6 +223,34 @@ export async function processMediaItem(mediaId: string) {
       thumbnails[name] = thumbKey;
     }
 
+    let clipEmbedding: number[] | null = null;
+    let blurScore: number | null = null;
+    let aiTags: string[] = [];
+    let detectedFaces: any[] = [];
+
+    try {
+        const formData = new FormData();
+        const blob = new Blob([new Uint8Array(thumbnailBuffer)], { type: "image/jpeg" });
+        formData.append("file", blob, "image.jpg");
+
+        const aiResp = await fetch(`${env.ML_API_URl}/analyze/image`, {
+            method: "POST",
+            body: formData as any,
+        });
+
+        if (aiResp.ok) {
+          const aiData = await aiResp.json();
+          clipEmbedding = aiData.clipEmbedding;
+          blurScore = aiData.blurScore;
+          aiTags = aiData.tags || [];
+          detectedFaces = aiData.faces || [];
+        } else {
+            console.error("AI analysis failed", aiResp.status);
+        }
+    } catch (err) {
+        console.error("Failed to reach ML", err);
+    }
+
     await db
       .update(media)
       .set({
@@ -233,9 +262,67 @@ export async function processMediaItem(mediaId: string) {
         cameraModel,
         gpsLat,
         gpsLng,
-        hash: fileHash
+        hash: fileHash,
+        clipEmbedding,
+        blurScore
       })
       .where(eq(media.id, item.id));
+
+      if (aiTags.length > 0) {
+        for (const tagName of aiTags) {
+          const existingsTags = await db.insert(tags)
+              .values({ ownerId: item.ownerId, name: tagName })
+              .onConflictDoNothing()
+              .returning({ id: tags.id });
+          
+          let tagId = existingsTags[0]?.id;
+          if (!tagId) {
+              const t = await db.query.tags.findFirst({ where: and(eq(tags.name, tagName), eq(tags.ownerId, item.ownerId)) });
+              if (t) tagId = t.id;
+          }
+
+          if (tagId) {
+              await db.insert(mediaTags).values({ mediaId: item.id, tagId }).onConflictDoNothing();
+          }
+        }
+      }
+
+      if (detectedFaces.length >  0) {
+        for (const face of detectedFaces) {
+            const embeddingStr = `[${face.embedding.join(',')}]`;
+            const result = await db.execute(sql`
+                SELECT person_id, (face_embedding <=> ${embeddingStr}::vector) AS distance
+                FROM ${faces}
+                WHERE face_embedding is NOT NULL
+                ORDER BY distance ASC
+                LIMIT 1    
+            `);
+
+            let personId: string;
+            const closestMatch = result[0] as { person_id: string, distance: number } | undefined;
+            if (closestMatch && closestMatch.distance < 0.40) {
+                personId = closestMatch.person_id;
+            } else {
+                const newPerson = await db.insert(people).values({
+                    ownerId: item.ownerId,
+                    name: "Unknown Person"
+                }).returning({ id: people.id });
+                personId = newPerson[0].id
+            }
+
+            const insertedFace = await db.insert(faces).values({
+                mediaId: item.id,
+                personId: personId,
+                boundingBox: face.boundingBox,
+                faceEmbedding: face.embedding
+            }).returning({ id: faces.id });
+
+            await db.execute(sql`
+                UPDATE ${people} SET cover_face_id = ${insertedFace[0].id}
+                WHERE id = ${personId} AND cover_face_id is NULL    
+            `);
+        }
+      }
 
       console.log(`processed ${isVideo ? 'video' : 'image'}: ${item.filename}`);
       await redisCache.del(`user_photos_timeline:${item.ownerId}`);

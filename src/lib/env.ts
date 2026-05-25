@@ -16,5 +16,6 @@ export const env = {
     MINIO_SECRET_KEY: getEnv("MINIO_SECRET_KEY"),
     MINIO_BUCKET: getEnv("MINIO_BUCKET"),
     AUTH_SECRET: getEnv("AUTH_SECRET"),
-    APP_URL: getEnv("NEXT_PUBLIC_APP_URL")
+    APP_URL: getEnv("NEXT_PUBLIC_APP_URL"),
+    ML_API_URl: getEnv("ML_API_URL", false)
 };
