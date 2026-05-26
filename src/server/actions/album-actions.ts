@@ -5,7 +5,7 @@ import { albums, albumMedia, media } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
-import { mediaQueue } from "@/lib/queue";
+import { addMediaToPipe } from "@/lib/queue";
 import { redisCache } from "@/lib/cache";
 import { logAuditEvent } from "@/lib/audit";
 
@@ -141,7 +141,7 @@ export async function uploadNewCoverAction(albumId: string, data: { filename: st
             hash: "pending",
         }).returning();
 
-        await mediaQueue.add('process', { mediaId: newMedia.id });
+        await addMediaToPipe(newMedia.id);
         await db.insert(albumMedia).values({ albumId, mediaId: newMedia.id });
         await db.update(albums).set({ coverMediaId: newMedia.id }).where(eq(albums.id, albumId));
 

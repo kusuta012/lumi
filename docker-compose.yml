@@ -35,9 +35,36 @@ services:
       context: ./ml
     ports:
       - "8000:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
     restart: unless-stopped
     volumes:
       - huggingface_cache:/root/.cache/huggingface
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lumi-dev-worker-1
+    command: npx tsx watch -r dotenv/config src/jobs/worker.ts
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://lumi:iykykoknoyes@localhost:5432/lumi"
+      REDIS_URL: "redis://redis:6379"
+      MINIO_ENDPOINT: "minio"
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: "admin"
+      MINIO_SECRET_KEY: "sawssawssaws"
+      MINIO_BUCKET: "lumi-media"
+      ML_API_URL: "http://ml:8000"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - ml
+    volumes:
+      - .:/app
+      - /app/node_modules
 
 volumes:
   postgres_data:

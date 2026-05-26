@@ -5,7 +5,7 @@ import { shareLinks, albums, albumMedia, users, media, albumContributors } from 
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
-import { mediaQueue } from "@/lib/queue";
+import { addMediaToPipe } from "@/lib/queue";
 import { eq, sql, and } from "drizzle-orm";
 
 export async function createShareLink(data: {
@@ -126,7 +126,7 @@ export async function publicUploadToSharedAlbum(token: string, data: {
             await tx.update(users)
                 .set({ storageUsed: sql`${users.storageUsed} + ${sizeInMB}` })
                 .where(eq(users.id, link.ownerId));
-            await mediaQueue.add('process', { mediaId: newMedia.id });
+            await addMediaToPipe(newMedia.id)
         });
 
         revalidatePath(`s/${token}`);

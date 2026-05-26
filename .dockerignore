@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+dist
+build
+postgres_data
+redis_data
+minio_data
+huggingface_cache
+.cache
+ml
+.git
+.env
