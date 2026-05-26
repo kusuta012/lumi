@@ -3,33 +3,47 @@ import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { processMediaItem } from '@/server/services/processor';
 import { env } from '@/lib/env'
-import { migrationQueue } from "@/lib/queue";
 import { processMigrationJob } from "@/server/services/migration-processor";
 import { cleanExpiredTrash } from "@/server/actions/media-mutations";
+import path from "path"
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
 });
 
-const worker = new Worker('media-processing', async (job) => {
-    await processMediaItem(job.data.mediaId);
-}, { connection });
+const metadataWorker = new Worker(
+    'metadata-extraction',
+    path.join(__dirname, 'metadata-processor.ts'),
+    { connection, concurrency: 8 }
+);
 
-worker.on('completed', (job) => {
-    console.log(`[WORKer] job ${job.id} completed successfully`);
-})
+const thumbnailWorker = new Worker(
+    'thumbnail-generation',
+    path.join(__dirname, 'thumbnail-processor.ts'),
+    { connection, concurrency: 4 }
+);
 
-worker.on('failed', (job, err) => {
-    console.error(`[WORKER] job ${job?.id} failed`, err)
-})
+const aiWorker = new Worker(
+    'ai-indexing',
+    path.join(__dirname, 'ai-processor.ts'),
+    { connection, concurrency: 2 }
+);
 
-console.log('lumi worker is active')
+function logging(worker: Worker, name: string) {
+    worker.on('completed', (job) => console.log(`[${name} job ${job.id}] completed`));
+    worker.on('failed', (job, err) => console.error([`${name} job ${job?.id} Failed:`, err]));
+}
 
+logging(metadataWorker, "Metadata");
+logging(thumbnailWorker, "Thumbnail");
+logging(aiWorker, "AI index");
+
+console.log('lumi workers are active')
 const migrator = new Worker('storage-migration', async (job) => {
     await processMigrationJob(job.data.sourceId, job.data.targetId);
 }, { connection });
 
-console.log("lumi migration worker is actibe");
+console.log('lumi migration worker is active');
 
 cleanExpiredTrash();
 setInterval(() => {

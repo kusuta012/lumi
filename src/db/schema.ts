@@ -1,7 +1,19 @@
 import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, real, primaryKey, index, customType } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
-const vector = customType<{ data: number[]; driverData: string }>({
+const clipVector = customType<{ data: number[]; driverData: string }>({
+    dataType() {
+        return 'vector(512)';
+    },
+    toDriver(value: number[]) {
+        return `[${value.join(`,`)}]`;
+    },
+    fromDriver(value: string) {
+        return JSON.parse(value);
+    }
+});
+
+const fVector = customType<{ data: number[]; driverData: string }>({
     dataType() {
         return 'vector(512)';
     },
@@ -100,8 +112,10 @@ export const media = pgTable('media', {
     isEncrypted: boolean('is_encrypted').default(true),
     isLocked: boolean('is_locked').default(false),
     blurScore: real('blue_score'),
-    clipEmbedding: vector('clip_embedding'),
+    clipEmbedding: clipVector('clip_embedding'),
     extractedText: text('extracted_text'),
+    hoverSpriteKey: text('hover_sprite_key'),
+    hlsPlaylistKey: text('hls_playlist_key'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
 }, (table) => [
@@ -205,7 +219,7 @@ export const faces = pgTable('faces', {
     boundingBox: jsonb('bounding_box').notNull().$type<{
         x: number; y: number; w: number; h: number;
     }>(),
-    faceEmbedding: vector('face_embedding'),
+    faceEmbedding: fVector('face_embedding'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
     index('faces_media_idx').on(table.mediaId),

@@ -16,6 +16,7 @@ export async function GET(
     const { id } = await params;
     const { searchParams } = new URL(req.url);
     const size = searchParams.get("size") || "original";
+    const hlsFile = searchParams.get("hls");
 
     const cacheKey = `media_meta:${id}`;
     let item = await redisCache.get(cacheKey);
@@ -51,15 +52,28 @@ export async function GET(
     try {
         const { client, bucket } = getStorageClient(item.storageBackend?.config, item.storageBackendId);
         let objectKey = item.objectKey;
-        if (size !== "original" && item.thumbnails) {
+        let contentType = item.mimetype;
+
+        if (hlsFile) {
+            objectKey = `hls/${item.ownerId}/${item.id}/${hlsFile}`;
+            contentType = hlsFile.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp2t";
+        }
+
+        else if (size === "sprite" && item.hoverSpriteKey) {
+            objectKey = item.hoverSpriteKey;
+            contentType = "image/webp";
+        }
+
+        else if (size !== "original" && item.thumbnails) {
             const thumbs = item.thumbnails as Record<string, string>;
             if (thumbs[size]) {
                 objectKey = thumbs[size];
+                contentType = "image/webp";
             }
         }
 
         const range = req.headers.get("range");
-        if (item.mimetype.startsWith("video/") && range && size === "original") {
+        if (item.mimetype.startsWith("video/") && range && size === "original" && !hlsFile) {
             const stat = await client.statObject(bucket, objectKey);
             const parts = range.replace(/bytes=/, "").split("-");
             const start  = parseInt(parts[0], 10);
@@ -86,12 +100,12 @@ export async function GET(
                 },
             }); 
         } catch (err: any) {
-            if (err.code === 'NoSuchKey' && size !== "original") {
+            if (err.code === 'NoSuchKey' && size !== "original" && !hlsFile) {
                 const fallbackStream = await client.getObject(bucket, item.objectKey);
                 return new NextResponse(fallbackStream as any, {
                     headers: {
                         "Content-Type": item.mimetype,
-                        "Cache-Control": "public, max=31536000, immutable",
+                        "Cache-Control": "public, max-age=31536000, immutable",
                     },
                 });
             }

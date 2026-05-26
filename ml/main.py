@@ -9,7 +9,7 @@ from PIL import Image
 import io
 import torch
 from transformers import CLIPProcessor, CLIPModel, ViTImageProcessor, ViTForImageClassification
-from facenet_pytorch import MTCNN, InceptionResnetV1
+from insightface.app import FaceAnalysis
 import easyocr
 
 
@@ -18,14 +18,14 @@ print("loading ai")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device.upper()}")
 
-clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-
-mtcnn = MTCNN(keep_all=True, device=device)
-resnet = InceptionResnetV1(pretrained='vggface2').eval().to(device)
+clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16").to(device)
+clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
 
 vit_processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
 vit_model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224').to(device)
+
+face_analysis = FaceAnalysis(name='buffalo_sc', root='.', provider=['CPUExecutionProvider'])
+face_analysis.prepare(ctx_id=0, det_size=(640, 640))
 
 reader = easyocr.Reader(['en'], gpu=torch.cuda.is_available())
 
@@ -95,23 +95,27 @@ async def analyze_image(file: UploadFile = File(...)):
 
 
         faces_data = []
-        boxes, probs = mtcnn.detect(pil_image)
+        detected_faces = face_analysis.get(cv_image)
 
-        if boxes is not None:
-            face_tensors = mtcnn(pil_image)
-            if face_tensors is not None:
-                with torch.no_grad():
-                    embeddings = resnet(face_tensors.to(device))
+        for face in detected_faces:
+            if face.det_score > 0.60:
+                x1, y1, x2, y2 = face.bbox
+                embedding = face.normed_embedding if hasattr(face, "normed_embedding") else face.embedding
 
-                for i, box in enumerate(boxes):
-                    if probs[i] > 0.90:
-                        x1, y1, x2, y2 = box
-                        faces_data.append({
-                            "boundingBox": {"x": float(x1), "y": float(y1), "w": float(x2 - x1), "h": float(y2 - y1)},
-                            "embedding": embeddings[i].cpu().numpy().tolist()
-                        })
+                faces_data.append({
+                    "boundingBox": {"x": float(x1), "y": float(y1), "w": float(x2 - x1), "h": float(y2 - y1)},
+                    "embedding": embedding.tolist()
+                })
         
-        ocr_results = reader.readtext(cv_image, detail=0)
+        max_ocr_sz = 640
+        h, w = cv_image.shape[:2]
+        if max(h, w) > max_ocr_sz:
+            scale = max_ocr_sz / max(h, w)
+            ocr_img = cv2.resize(cv_image, (int(w * scale), int(h * scale)))
+        else:
+            ocr_img = cv_image
+
+        ocr_results = reader.readtext(ocr_img, detail=0, contrast_ths=0.1)
         extracted_text = " ".join(ocr_results)
 
         return {

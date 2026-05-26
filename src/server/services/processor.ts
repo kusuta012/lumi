@@ -15,6 +15,7 @@ import os from "os";
 import { redisCache } from "@/lib/cache";
 import crypto from "crypto";
 import { env } from "@/lib/env"
+import { thumbnailQueue, aiQueue } from "@/lib/queue";
 
 sharp.concurrency(2);
 sharp.cache({ items: 50, memory: 100 });
@@ -51,18 +52,17 @@ export async function processMediaItem(mediaId: string) {
     with: { storageBackend: true }
   })
   
-  if (!item || !ffmpegPath) return;
+  if (!item || !ffmpegPath || !ffprobePath ) return;
   const { client, bucket } = getStorageClient(item?.storageBackend?.config);
 
-  
-
   const isVideo = item.mimetype.startsWith("video/");
-  const tempInput = path.join(os.tmpdir(), `lumi-input-${item.id}`);
+  const tempInput = path.join(os.tmpdir(), `lumi-metadata-${item.id}`);
 
   try {
     await client.fGetObject(bucket, item.objectKey, tempInput);
 
     const fileHash = await calcFileHash(tempInput);
+
     const existingMedia = await db.query.media.findFirst({
         where: and(
           eq(media.hash, fileHash),
@@ -83,7 +83,9 @@ export async function processMediaItem(mediaId: string) {
         cameraModel: existingMedia.cameraModel,
         gpsLat: existingMedia.gpsLat,
         gpsLng: existingMedia.gpsLng,
-        storageBackendId: existingMedia.storageBackendId
+        storageBackendId: existingMedia.storageBackendId,
+        hoverSpriteKey: existingMedia.hoverSpriteKey,
+        hlsPlaylistKey: existingMedia.hlsPlaylistKey
       }).where(eq(media.id, item.id));
 
       const sizeInMB = item.size > 0 ? Math.max(1, Math.round(item.size / (1024 * 1024))) : 0;
@@ -91,6 +93,7 @@ export async function processMediaItem(mediaId: string) {
           .set({ storageUsed: sql`GREATEST(0, ${users.storageUsed} - ${sizeInMB})` })
           .where(eq(users.id, item.ownerId));
       await client.removeObject(bucket, item.objectKey);
+      await redisCache.del(`user_photos_timeline:${item.ownerId}`);
       return;
     }
 
@@ -101,13 +104,13 @@ export async function processMediaItem(mediaId: string) {
     let cameraModel: string | null = null;
     let gpsLat: number | null = null;
     let gpsLng: number | null = null;
-    let thumbnailBuffer: Buffer;
 
     if (isVideo) {
       const stats = await fs.stat(tempInput);
       if (stats.size === 0) {
         throw new Error(`0 bytes file, check minio connection`)
       }
+
       const { stdout: probeData } = await execa(ffprobePath, [
         "-v",
         "error",
@@ -127,28 +130,6 @@ export async function processMediaItem(mediaId: string) {
       width = Number(videoStream.width) || 0;
       height = Number(videoStream.height) || 0;
       duration = metadata.format.duration ? parseFloat(metadata.format.duration) : 0;
-
-      const { stdout: frameBuffer } = await execa(
-        ffmpegPath,
-        [
-          "-ss",
-          "00:00:01",
-          "-i",
-          tempInput,
-          "-vframes",
-          "1",
-          "-an",
-          '-threads', '2',
-          "-f",
-          "image2",
-          "-c:v",
-          "mjpeg",
-          "pipe:1",
-        ],
-        { encoding: null },
-      );
-
-      thumbnailBuffer = frameBuffer as unknown as Buffer;
     } else {
       const imageBuffer = await fs.readFile(tempInput);
       try {
@@ -156,7 +137,6 @@ export async function processMediaItem(mediaId: string) {
             const metadata = await pipeline.metadata();
             width = metadata.width || 0;
             height = metadata.height || 0;
-            thumbnailBuffer = imageBuffer
 
             if (metadata.exif) {
                 try {
@@ -171,8 +151,8 @@ export async function processMediaItem(mediaId: string) {
 
                     const imageData = exif.Image || exif.image;
 
-                    if (imageData.Image?.Model) {
-                    cameraModel = String(exif.Image.Model);
+                    if (imageData?.Model) {
+                    cameraModel = String(imageData.Model);
                     }
                     const gpsData = exif.GPSInfo || exif.GPS || exif.gps;
                     if (gpsData) {
@@ -181,14 +161,7 @@ export async function processMediaItem(mediaId: string) {
 
                       if (lat !== null && !isNaN(lat)) gpsLat = lat;
                       if (lng !== null && !isNaN(lng)) gpsLng = lng;
-
-                      console.log(`gps ${item.filename}`);
-                      console.log(`raw lat`, gpsData.GPSLatitude, `Ref`, gpsData.GPSLatitudeRef);
-                      console.log(`raw lng`, gpsData.GPSLongitude, `Ref`, gpsData.GPSLongitudeRef);
-                      console.log(`parsed: ${lat}, BOOLL ${lng}`);
-                    } else {
-                      console.log(`no gps metada ${item.filename}`)
-                    }
+                    } 
                 } catch (e) { console.warn("could not parse exif for", item.filename); }
               }
             } catch (e) {
@@ -203,9 +176,131 @@ export async function processMediaItem(mediaId: string) {
             }
           }
 
+          await db
+            .update(media)
+            .set({
+              width,
+              height,
+              duration,
+              dateTaken: dateTaken || item.createdAt,
+              cameraModel,
+              gpsLat,
+              gpsLng,
+              hash: fileHash
+            })
+            .where(eq(media.id, item.id));
+
+          await redisCache.del(`user_photos_timeline:${item.ownerId}`);
+          await thumbnailQueue.add("generate-thumbs", { mediaId });
+    } catch (err) {
+      console.error(`error extracting metadata ${item.id}`, err)
+      throw err;
+    } finally {
+      try { await fs.unlink(tempInput); } catch (e) {}
+    }
+  }
+  export async function processThumbnails(mediaId: string) {
+    const item = await db.query.media.findFirst({
+      where: eq(media.id, mediaId),
+      with: { storageBackend: true }
+    })
+
+    if (!item || !ffmpegPath || !ffprobePath) return;
+    const { client, bucket } = getStorageClient(item?.storageBackend?.config)
+    const isVideo = item.mimetype.startsWith("video/");
+    const tempInput = path.join(os.tmpdir(), `lumi-thumbs-${item.id}`);
+    const tempHlsDir = path.join(os.tmpdir(), `lumi-hls-gen-${item.id}`);
+
+    try {
+      await client.fGetObject(bucket, item.objectKey, tempInput);
+      let thumbnailBuffer: Buffer;
+      let hoverSpriteKey: string | null = null;
+      let hlsPlaylistKey: string | null = null;
+
+      if (isVideo) {
+        const { stdout: frameBuffer } = await execa(
+          ffmpegPath,
+          [
+            "-ss",
+            "00:00:01",
+            "-i",
+            tempInput,
+            "-vframes",
+            "1",
+            "-an",
+            '-threads', '2',
+            "-f",
+            "image2",
+            "-c:v",
+            "mjpeg",
+            "pipe:1",
+          ],
+          { encoding: null },
+        );
+        thumbnailBuffer = frameBuffer as unknown as Buffer;
+
+        try {
+          const spriteOutput = path.join(os.tmpdir(), `sprite-${item.id}.webp`);
+          await execa(ffmpegPath, [
+            "-y", "-i", tempInput,
+            "-t", "3",
+            "-vf", "fps=5,scale=320:-1:flags=lanczos",
+            "-vcodec", "libwebp", "-lossless", "0", "-q:v", "60", "-loop", "0", "-an",
+            spriteOutput
+          ]);
+          hoverSpriteKey = `sprites/${item.ownerId}/${item.id}.webp`;
+          await client.fPutObject(bucket, hoverSpriteKey, spriteOutput, { "Content-Type": "image/webp" });
+          await fs.unlink(spriteOutput);
+        } catch (err) {
+            console.error(`failed to genrate hover sprite ${item.filename}`, err);
+        }
+
+        const { stdout: probeData } = await execa(ffprobePath, [
+          "-v",
+          "error",
+          "-show_entries",
+          "stream=codec_name",
+          "-of",
+          "json",
+          tempInput,
+        ]);
+        const codec = JSON.parse(probeData)?.streams?.[0]?.codec_name || "";
+        const isHevc = codec === "hevc" || codec === "h265" || codec === "prores";
+        const isLarge = item.size > 50 * 1024 * 1024;
+        const isLong = (item.duration ?? 0) > 60;
+
+        if (isHevc || isLarge || isLong) {
+          await fs.mkdir(tempHlsDir, { recursive: true });
+          await execa(ffmpegPath, [
+              "-y", "-i", tempInput,
+              "-c:v", "libx264", "-crf", "23", "-preset", "veryfast",
+              "-vf", "scale=-2:720",
+              "-c:a", "aac", "-b:a", "128k", "-ac", "2",
+              "-f", "hls",
+              "-hls_time", "10",
+              "-hls_playlist_type", "vod",
+              "-hls_segment_filename", path.join(tempHlsDir, "segment_%03d.ts"),
+              path.join(tempHlsDir, "playlist.m3u8")
+          ]);
+
+          const files = await fs.readdir(tempHlsDir);
+          for (const file of files) {
+              const filePath = path.join(tempHlsDir, file);
+              const minioPath = `hls/${item.ownerId}/${item.id}/${file}`;
+              const contentType = file.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp2t";
+              await client.fPutObject(bucket, minioPath, filePath, { "Content-Type": contentType });
+
+              if (file.endsWith(".m3u8")) {
+                  hlsPlaylistKey = minioPath;
+              }
+          }
+        }
+      } else {
+        thumbnailBuffer = await fs.readFile(tempInput);
+      }
+
     const sizes = { small: 300, medium: 720, large: 1440 };
     const thumbnails: Record<string, string> = {};
-
     for (const [name, width] of Object.entries(sizes)) {
       const thumbBuffer = await sharp(thumbnailBuffer)
         .resize(width, null, { withoutEnlargement: true })
@@ -223,16 +318,49 @@ export async function processMediaItem(mediaId: string) {
       thumbnails[name] = thumbKey;
     }
 
+    await db.update(media).set({
+      thumbnails,
+      hoverSpriteKey,
+      hlsPlaylistKey
+    }).where(eq(media.id, item.id));
+    
+    await aiQueue.add("ai-index", {mediaId});
+  } catch (err) { console.error(`thumbnail gen error for ${item.id}`, err);
+    throw err;
+  } finally {
+    try { await fs.unlink(tempInput); } catch (e) {}
+    try { await fs.rm(tempHlsDir, { recursive: true, force: true }); } catch (e) {}
+  }
+}
+
+export async function processAiIndexing(mediaId: string) {
+  const item = await db.query.media.findFirst({
+      where: eq(media.id, mediaId),
+      with: { storageBackend: true }
+  });
+
+  if (!item) return;
+  const { client, bucket } = getStorageClient(item?.storageBackend?.config);
+
+  try {
     let clipEmbedding: number[] | null = null;
     let blurScore: number | null = null;
     let aiTags: string[] = [];
     let detectedFaces: any[] = [];
     let extractedText: string | null = null;
 
+    const isVideo = item.mimetype.startsWith("video/") 
+    const thumbKey = (item.thumbnails as any)?.small || item.objectKey;
+    const stream = await client.getObject(bucket, thumbKey);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
     try {
-        const formData = new FormData();
-        const blob = new Blob([new Uint8Array(thumbnailBuffer)], { type: "image/jpeg" });
-        formData.append("file", blob, "image.jpg");
+      const formData = new FormData();
+      formData.append("file", new Blob([new Uint8Array(buffer)]), "image.jpg");
 
         const aiResp = await fetch(`${env.ML_API_URl}/analyze/image`, {
             method: "POST",
@@ -256,18 +384,9 @@ export async function processMediaItem(mediaId: string) {
     await db
       .update(media)
       .set({
-        width,
-        height,
-        duration,
-        thumbnails,
-        dateTaken: dateTaken || item.createdAt,
-        cameraModel,
-        gpsLat,
-        gpsLng,
-        hash: fileHash,
         clipEmbedding,
         blurScore,
-        extractedText
+        extractedText,
       })
       .where(eq(media.id, item.id));
 
@@ -330,14 +449,11 @@ export async function processMediaItem(mediaId: string) {
       console.log(`processed ${isVideo ? 'video' : 'image'}: ${item.filename}`);
       await redisCache.del(`user_photos_timeline:${item.ownerId}`);
       await redisCache.del(`user_albums_grid:${item.ownerId}`);
-
-      if (gpsLat !== null && gpsLng !== null) {
+      if (item.gpsLat !== null && item.gpsLng !== null) {
         await redisCache.del(`user_locations:${item.ownerId}`);
       }
-
-  } catch (err) {
-    console.error(`error processing for ${item.id}`, err)
-  } finally {
-        try { await fs.unlink(tempInput); } catch (e) {}
+    } catch (err) {
+      console.error(`AI processing erorr for ${item.id}`, err);
+      throw err;
+    }
   }
-}
