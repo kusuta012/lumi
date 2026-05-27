@@ -9,6 +9,7 @@ import ShareModal from "./ShareModal";
 import { useNotification } from "../providers/NotificationProvider";
 import { useInView } from "react-intersection-observer";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
+// import { useSearchParams, useRouter } from "next/navigation";
 
 interface MediaItem {
     id: string,
@@ -114,6 +115,24 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         setCursor(initialMedia.length >= 50 && !isSearchPage ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null);
         setHasMore(initialMedia.length >= 50 && !isSearchPage);
     }, [initialMedia, isSearchPage]);
+
+    // const searchParams = useSearchParams();
+    //     const router = useRouter();
+    //     const hasAutoOpened = useRef(false);
+
+    // useEffect(() => {
+    //     if (hasAutoOpened.current) return;
+    //     const openId = searchParams?.get("open");
+    //     if (openId && mediaItems.length > 0) {
+    //         const index = mediaItems.findIndex(m => m.id === openId);
+    //         if (index !== -1) {
+    //             setSelectedIndex(index);
+    //             hasAutoOpened.current = true;
+    //             router.replace(window.location.pathname, { scroll: false });
+    //         }
+    //     }
+    // }, [searchParams, mediaItems, router]);  
+    //  ^ I just scrapped this code and found a better way to do it
 
     const groupedMedia = mediaItems.reduce<Record<string, MediaItem[]>>((acc, item) => {
         const d = item.dateTaken ? new Date(item.dateTaken) : new Date(item.createdAt);

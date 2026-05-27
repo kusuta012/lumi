@@ -36,11 +36,11 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
     })
     .from(media)
     .where(and(
-        eq(faces.personId, personId),
+        eq(media.ownerId, session.user.id),
         eq(media.isDeleted, false),
         eq(media.isLocked, false),
         exists(
-            db.select()
+            db.select({ id: faces.id })
                 .from(faces)
                 .where(and(
                     eq(faces.mediaId, media.id),
