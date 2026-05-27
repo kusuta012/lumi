@@ -43,7 +43,7 @@ function getRamUsage() {
     const used = total - free;
     return {
         usedStr: (used / 1024 / 1024 / 1024).toFixed(2),
-        totalStr: (used / 1024 / 1024 / 1024).toFixed(2),
+        totalStr: (total / 1024 / 1024 / 1024).toFixed(2),
         percent: Math.round((used / total) * 100)
     };
 }
