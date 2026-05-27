@@ -45,10 +45,10 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: lumi-dev-worker-1
-    command: npx tsx watch -r dotenv/config src/jobs/worker.ts
+    command: npx tsx src/jobs/worker.ts
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgres://lumi:iykykoknoyes@localhost:5432/lumi"
+      DATABASE_URL: "postgres://lumi:iykykoknoyes@postgres:5432/lumi"
       REDIS_URL: "redis://redis:6379"
       MINIO_ENDPOINT: "minio"
       MINIO_PORT: 9000
@@ -57,14 +57,13 @@ services:
       MINIO_SECRET_KEY: "sawssawssaws"
       MINIO_BUCKET: "lumi-media"
       ML_API_URL: "http://ml:8000"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      AUTH_SECRET: "d420be4dba7f4f8938595feb956cb8d423c580026904435ce76ecab8568c4074"
     depends_on:
       - postgres
       - redis
       - minio
       - ml
-    volumes:
-      - .:/app
-      - /app/node_modules
 
 volumes:
   postgres_data:

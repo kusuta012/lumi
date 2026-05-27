@@ -51,12 +51,15 @@ export default async function SearchPage({
             }
         }
         else if (mode === "ocr") {
+            const tokens = query.trim().split(/\s+/).filter(Boolean);
+            const ocrConds = tokens.map(token => ilike(media.extractedText, `%${token}%`));  
             results = await db.query.media.findMany({
                 where: and(
                     eq(media.ownerId, session.user.id),
                     eq(media.isDeleted, false),
                     eq(media.isLocked, false),
-                    ilike(media.extractedText, `%${query}%`)
+                    isNotNull(media.extractedText),
+                    and(...ocrConds)
                 ),
                 orderBy: [desc(media.dateTaken), desc(media.createdAt)],
                 limit: 50

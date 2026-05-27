@@ -1,7 +1,6 @@
 "use server";
 
-import { media } from "@/db/schema";
-import { mediaQueue, migrationQueue } from "@/lib/queue";
+import { metadataQueue, thumbnailQueue, aiQueue, migrationQueue } from "@/lib/queue";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 
@@ -15,10 +14,14 @@ async function ensureSuperAdmin() {
 export async function getQueueStats() {
     await ensureSuperAdmin();
     try {
-        const [mediaCounts, migrationCounts, isMediaPaused, isMigrationPaused] = await Promise.all([
-            mediaQueue.getJobCounts(),
+        const [metadataCounts, thumbnailCounts, aiCounts, migrationCounts, isMetadataPaused, isThumbnailPaused, isAiPaused, isMigrationPaused] = await Promise.all([
+            metadataQueue.getJobCounts(),
+            thumbnailQueue.getJobCounts(),
+            aiQueue.getJobCounts(),
             migrationQueue.getJobCounts(),
-            mediaQueue.isPaused(),
+            metadataQueue.isPaused(),
+            thumbnailQueue.isPaused(),
+            aiQueue.isPaused(),
             migrationQueue.isPaused()
         ]);
 
@@ -26,10 +29,22 @@ export async function getQueueStats() {
             success: true,
             queues: [
                 {
-                    name: "media-processing",
-                    displayName: "Media Processor",
-                    counts: mediaCounts,
-                    isPaused: isMediaPaused
+                    name: "metadata-extraction",
+                    displayName: "Metadata Extractor",
+                    counts: metadataCounts,
+                    isPaused: isMetadataPaused
+                },
+                {
+                    name: "thumbnail-generation",
+                    displayName: "Thumbnail Generator",
+                    counts: thumbnailCounts,
+                    isPaused: isThumbnailPaused
+                },
+                {
+                    name: "ai-indexing",
+                    displayName: "AI Indexer",
+                    counts: aiCounts,
+                    isPaused: isAiPaused
                 },
                 {
                     name: "storage-migration",
@@ -47,7 +62,19 @@ export async function getQueueStats() {
 
 export async function manageQueue(queueName: string, action: 'retry' | 'clean' | 'toggle-pause') {
     await ensureSuperAdmin();
-    const queue = queueName === "media-processing" ? mediaQueue : migrationQueue;
+
+    let queue;
+    if (queueName === "metadata-extraction") {
+        queue = metadataQueue;
+    } else if (queueName === "thumbnail-generation") {
+        queue = thumbnailQueue;
+    } else if (queueName === "ai-indexing") {
+        queue = aiQueue;
+    } else if (queueName === "storage-migration") {
+        queue = migrationQueue;
+    } else {
+        return { success: false, error: "Invalid queue name" };
+    }
 
     try {
         if (action === 'retry') {

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
-import { processMediaItem } from '@/server/services/processor';
+import { processMediaItem, processThumbnails, processAiIndexing } from '@/server/services/processor';
 import { env } from '@/lib/env'
 import { processMigrationJob } from "@/server/services/migration-processor";
 import { cleanExpiredTrash } from "@/server/actions/media-mutations";
@@ -13,21 +13,21 @@ const connection = new IORedis(env.REDIS_URL!, {
 
 const metadataWorker = new Worker(
     'metadata-extraction',
-    path.join(__dirname, 'metadata-processor.ts'),
-    { connection, concurrency: 8 }
-);
+    async (job) => {
+        await processMediaItem(job.data.mediaId);
+    }, { connection, concurrency: 8 });
 
 const thumbnailWorker = new Worker(
     'thumbnail-generation',
-    path.join(__dirname, 'thumbnail-processor.ts'),
-    { connection, concurrency: 4 }
-);
+    async (job) => {
+        await processThumbnails(job.data.mediaId);
+    }, { connection, concurrency: 4 });
 
 const aiWorker = new Worker(
     'ai-indexing',
-    path.join(__dirname, 'ai-processor.ts'),
-    { connection, concurrency: 2 }
-);
+    async (job) => {
+        await processAiIndexing(job.data.mediaId);
+    }, { connection, concurrency: 2 });
 
 function logging(worker: Worker, name: string) {
     worker.on('completed', (job) => console.log(`[${name} job ${job.id}] completed`));

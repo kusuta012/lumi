@@ -115,7 +115,7 @@ async def analyze_image(file: UploadFile = File(...)):
         else:
             ocr_img = cv_image
 
-        ocr_results = reader.readtext(ocr_img, detail=0, contrast_ths=0.1)
+        ocr_results = reader.readtext(ocr_img, detail=0, contrast_ths=0.1, paragraph=True)
         extracted_text = " ".join(ocr_results)
 
         return {
