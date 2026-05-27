@@ -86,7 +86,7 @@ export async function GET(
                     "Content-Range": `bytes ${start}-${end}/${stat.size}`,
                     "Accept-Ranges": "bytes",
                     "Content-Length": (end - start + 1).toString(),
-                    "Content-Type": item.mimetype,
+                    "Content-Type": contentType,
                 },
             });
         }

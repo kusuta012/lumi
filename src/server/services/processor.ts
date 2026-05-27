@@ -323,6 +323,7 @@ export async function processMediaItem(mediaId: string) {
       hoverSpriteKey,
       hlsPlaylistKey
     }).where(eq(media.id, item.id));
+    await redisCache.del(`media_meta:${item.id}`);
     
     await aiQueue.add("ai-index", {mediaId});
   } catch (err) { console.error(`thumbnail gen error for ${item.id}`, err);

@@ -22,6 +22,7 @@ interface MediaItem {
     size: number;
     width: number | null;
     height: number | null;
+    duration?: number | null;
 }
 
 interface Props {
@@ -37,6 +38,13 @@ interface Props {
     allowDownload?: boolean;
 }
 
+function formatDuration(seconds: number | null | undefined): string {
+    if (!seconds) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false,  isLockedPage = false, isSearchPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
     const { notify } = useNotification();
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -46,6 +54,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     const [isPending, startTransition] = useTransition();
     const isSelectionMode = selectedIds.length > 0;
     const [mediaItems, setMediaItems] = useState<MediaItem[]>(initialMedia);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [cursor, setCursor] = useState<string | null>(
         initialMedia.length === 50 && !isSearchPage ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null
     )
@@ -234,9 +243,20 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
                                 {items.map((item) => {
                                     const isSelected = selectedIds.includes(item.id);
+                                    const isVideo = item.mimetype.startsWith("video/");
+                                    const isHovered = hoveredId === item.id;
+                                    const imageSrc = (isVideo && isHovered) ? `/api/media/${item.id}?size=sprite` : `/api/media/${item.id}?size=small`;
                                     return(
-                                        <div key={item.id} onClick={() => isSelectionMode ? toggleSelect(item.id) : setSelectedIndex(mediaItems.indexOf(item))} className={`relative group aspect-square bg-surface overflow-hidden cursor-pointer transition-all duration-300 ${ isSelected ? 'ring-4 ring-orange-500 ring-inset' : 'hover:ring-2 ring-orange-500'}`}>
-                                        <img src={`/api/media/${item.id}?size=small`} alt={item.filename} className={`w-full h-full object-cover transition-transform duration-500 ${isSelected ? 'scale-90 opacity-80' : 'group-hover:scale-110'}`} loading="lazy" />
+                                        <div key={item.id} onClick={() => isSelectionMode ? toggleSelect(item.id) : setSelectedIndex(mediaItems.indexOf(item))} onMouseEnter={() => isVideo && setHoveredId(item.id)} onMouseLeave={() => isVideo && setHoveredId(null)} className={`relative group aspect-square bg-surface overflow-hidden cursor-pointer transition-all duration-300 ${ isSelected ? 'ring-4 ring-orange-500 ring-inset' : 'hover:ring-2 ring-orange-500'}`}>
+                                        <img src={imageSrc} alt={item.filename} className={`w-full h-full object-cover transition-transform duration-500 ${isSelected ? 'scale-90 opacity-80' : 'group-hover:scale-110'}`} loading="lazy" />
+                                        
+                                        {isVideo && !isHovered && (
+                                            <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-background/60 backdrop-blur-md rounded border border-white/10 text-[10px] font-bold text-foreground flex items-center gap-1 shadow">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                                {item.duration ? formatDuration(item.duration) : "VIDEO"}
+                                            </div>
+                                        )}
+
                                         <button onClick={(e) => toggleSelect(item.id, e)} className={`absolute top-2 left-2 z-20 transition-all duration-200 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                                         <div className={`rounded-full p-0.5 ${isSelected ? 'bg-orange-500 text-foreground' : 'bg-background/40 text-foreground/70 backdrop-blur-md border border-white/20'}`}>
                                             <CheckCircle2 size={20} />
