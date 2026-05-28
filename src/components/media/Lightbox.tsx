@@ -1,15 +1,17 @@
 "use client";
 
-import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon } from "lucide-react";
+import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Tag, Loader2, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon, Edit2 } from "lucide-react";
 import { format } from "date-fns";
 import { useTransition, useState, useEffect } from "react";
-import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction } from "@/server/actions/media-mutations";
+import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction, getTags, addTags, removeTag } from "@/server/actions/media-mutations";
 import { updateAlbumAction } from "@/server/actions/album-actions";
 import { moveToLockedFolder } from "@/server/actions/locked-actions";
 import { restoreFromLockedFolder } from "@/server/actions/locked-actions";
 import { useRouter } from "next/navigation";
 import ShareModal from "./ShareModal";
 import { useNotification } from "../providers/NotificationProvider";
+import TagModal from "./TagModal";
+
 
 interface LightboxProps {
     items: any[];
@@ -30,6 +32,10 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
     const [isFav, setIsFav] = useState(item?.isFavorited ?? false);
     const [isArchived, setIsArchived] = useState(item?.isArchived ?? false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+    const [tagsList, setTagsList] = useState<{ id: string; name: string }[]>([]);
+    const [newTagName, setNewTagName] = useState("");
+    const [isLoadingTags, setLoadingTags] = useState(false);
 
     useEffect(() => {
         if (!item) {
@@ -39,6 +45,17 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
         setIsFav(item.isFavorited);
         setIsArchived(item.isArchived);
     }, [item, onClose]);
+
+    useEffect(() => {
+        if (!showInfo || !item?.id) return;
+        setLoadingTags(true);
+        getTags(item.id).then(res => {
+            if (res.success && res.tags) {
+                setTagsList(res.tags);
+            }
+            setLoadingTags(false);
+        });
+    }, [item?.id, showInfo]);
 
     const goNext = () => index < items.length - 1 && setIndex(index + 1);
     const goPrev = () => index > 0 && setIndex(index - 1);
@@ -163,6 +180,31 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
         });
     };
 
+    const handleAddTag = async (e: React.SyntheticEvent) => {
+        e.preventDefault();
+        const tName = newTagName.trim();
+        if (!tName || tagsList.length >= 5) return;
+
+        const res = await addTags(item.id, tName);
+        if (res.success && res.tag) {
+            setTagsList(prev => [...prev, res.tag!]);
+            setNewTagName("");
+            notify("success", "Added", `Tag #${tName} added`)
+        } else {
+            notify("error", "Error", res.error || "failed to add tag");
+        }
+    }; 
+
+    const handleRemoveTag = async (tagId: string, tagName: string) => {
+        const res = await removeTag(item.id, tagId);
+        if (res.success) {
+            setTagsList(prev => prev.filter(t => t.id !== tagId));
+            notify("success", "Removed", `Tag #${tagName} removed`);
+        } else {
+            notify("error", "Error", "Failed to remove tag");
+        }
+    };
+
     if (!item) return null;
     return (
         <div className="fixed inset-0 z-[999999] bg-background flex overflow-hidden animate-in fade-in duration-200">
@@ -259,12 +301,39 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                             <DetailSection icon={<MapPin className="w-5 h-5" />} label="Location" value={`${item.gpsLat.toFixed(4)}, ${item.gpsLng.toFixed(4)}`} />
                         )}
                         <DetailSection icon={<FileText className="w-5 h-5" />} label="File Details" value={item.filename} sub={`${(item.size / 1024 / 1024).toFixed(2)} MB • ${item.width} x ${item.height}`} />
+                        <div className="pt-6 border-t border-border">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-xs font-bold text-muted tracking-wider flex items-center gap-2">
+                                    <Tag size={14} />
+                                    {tagsList.length === 0 ? "Add tags" : `Tags (${tagsList.length}/5)`}
+                                </h3>
+                                <button onClick={() => setIsTagModalOpen(true)} className="text-muted hover:text-foreground transition-colors p-1 rounded-full hover:bg-background/10">
+                                    <Edit2 size={14} />
+                                </button>
+                            </div>
+                            {isLoadingTags ? (
+                                <div className="flex items-center gap-2 text-xs text-muted font-bold">
+                                    <Loader2 size={12} className="animate-spin text-orange-500" />
+                                    Loading Tags..
+                                </div>
+                            ) : tagsList.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {tagsList.map(tag => (
+                                        <span key={tag.id} onClick={() => setIsTagModalOpen(true)} className="inline-flex items-center px-2.5 py-1 rounded-full bg-surface-hover border border-border text-[10px] font-bold text-foreground cursor-pointer hover:border-orange-500/40">
+                                            #{tag.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
             )}
             {isShareModalOpen && (
                 <ShareModal targetId={item.id} type="media" onClose={() => setIsShareModalOpen(false)} />
             )}
+
+            <TagModal isOpen={isTagModalOpen} onClose={() => setIsTagModalOpen(false)} tagsList={tagsList} onAddTag={handleAddTag} onRemoveTag={handleRemoveTag} isLoading={isLoadingTags} newTagName={newTagName} setNewTagName={setNewTagName} />
         </div>
     );
 }

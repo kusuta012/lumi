@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { albumMedia, media, albums, users, storageBackends } from "@/db/schema";
+import { albumMedia, media, albums, users, tags, mediaTags } from "@/db/schema";
 import { eq, and, inArray, notInArray, sql, count, lt } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
@@ -229,5 +229,142 @@ export async function cleanExpiredTrash() {
     }
   } catch (err) {
     console.error("trash clean failed", err);
+  }
+}
+
+export async function getTags(mediaId: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  try {
+    const results = await db.select({
+        id: tags.id,
+        name: tags.name
+    })
+    .from(tags)
+    .innerJoin(mediaTags, eq(mediaTags.tagId, tags.id))
+    .where(eq(mediaTags.mediaId, mediaId));
+    
+    return { success: true, tags: results };
+  } catch (err) {
+    console.error("failed to get tags", err);
+    return { success: false, error: "Failed to load tags" };
+  }
+}
+
+export async function addTags(mediaId: string, tagName: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const cleanTagName = tagName.trim().toLowerCase();
+  if (!cleanTagName) return { success: false, error: "tag cannot be empty" };
+
+  try {
+
+    const item = await db.query.media.findFirst({
+      where: and(eq(media.id, mediaId), eq(media.ownerId, session.user.id))
+    });
+    if (!item) return { success: false, error: "media not found" };
+
+    const currentTagsCnt = await db.select({ count: sql`count(*)::int` })
+      .from(mediaTags)
+      .where(eq(mediaTags.mediaId, mediaId));
+
+    if (currentTagsCnt[0]?.count >= 5) {
+      return { success: false, error: "max limit of tags reached"};
+    }
+
+    let tagId: string;
+    const existingTag = await db.query.tags.findFirst({
+      where: and(eq(tags.name, cleanTagName), eq(tags.ownerId, session.user.id))
+    });
+
+    if (existingTag) {
+      tagId = existingTag.id;
+    } else {
+      const [newTag] = await db.insert(tags).values({
+        ownerId: session.user.id,
+        name: cleanTagName
+      }).returning({ id: tags.id });
+      tagId = newTag.id;
+    }
+
+    await db.insert(mediaTags).values({
+      mediaId,
+      tagId
+    }).onConflictDoNothing();
+  
+    return { success: true, tag: { id: tagId, name: cleanTagName }};
+  } catch (err) {
+    console.error("failed to add tag", err);
+    return { success: false, error: "failed to add tag " };
+  }
+}
+
+export async function removeTag(mediaId: string, tagId: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  try {
+    const item = await db.query.media.findFirst({
+      where: and(eq(media.id, mediaId), eq(media.ownerId, session.user.id))
+    });
+    if (!item) return { success: false, error: "Media not found" };
+
+    await db.delete(mediaTags)
+      .where(and(eq(mediaTags.mediaId, mediaId), eq(mediaTags.tagId, tagId)));
+
+    return { success: true };
+  } catch (err) {
+    console.error("failed to remove tag", err);
+    return { success: false, error: "failed to remove tag" };
+  }
+}
+
+export async function bulkAddTags(mediaIds: string[], tagNames: string[]) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  if (mediaIds.length === 0 || tagNames.length === 0 ) return { success: true };
+
+  try {
+    await db.transaction(async (tx) => {
+      for (const mediaId of mediaIds) {
+        const item = await tx.query.media.findFirst({
+          where: and(eq(media.id, mediaId), eq(media.ownerId, session.user.id))
+        });
+        if (!item) continue;
+        for (const name of tagNames) {
+          const cleanName = name.trim().toLowerCase();
+          if (!cleanName) continue;
+
+          const currentTagsCnt = await tx.select({ count: sql`count(*)::int` })
+            .from(mediaTags)
+            .where(eq(mediaTags.mediaId, mediaId));
+          
+          if (currentTagsCnt[0]?.count >= 5) continue;
+
+          let tagId: string;
+          const existingTag = await tx.query.tags.findFirst({
+            where: and(eq(tags.name, cleanName), eq(tags.ownerId, session.user.id))
+          });
+
+          if (existingTag) {
+            tagId = existingTag.id;
+          } else {
+            const [newTag] = await tx.insert(tags).values({
+              ownerId: session.user.id,
+              name: cleanName
+            }).returning({ id: tags.id });
+            tagId = newTag.id;
+          }
+          await tx.insert(mediaTags).values({ mediaId, tagId }).onConflictDoNothing();
+          }
+        }
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error("bulk tagging failed", err);
+    return { success: false, error: "failed to apply bulk tags" };
   }
 }
