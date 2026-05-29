@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback, useRef } from "react";
+import { useState, useTransition, useEffect, useCallback, useRef, useMemo } from "react";
 import Lightbox from "./Lightbox";
 import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw } from "lucide-react";
 import AddToAlbumModal from "./AddToAlbumModal";
@@ -8,8 +8,9 @@ import { restoreMediaAction, deletePermanentlyAction, bulkMoveToTrashAction } fr
 import ShareModal from "./ShareModal";
 import { useNotification } from "../providers/NotificationProvider";
 import { useInView } from "react-intersection-observer";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 // import { useSearchParams, useRouter } from "next/navigation";
+import TimelineScrub, { ScrubberPoint } from "./TimelineScrub";
 
 interface MediaItem {
     id: string,
@@ -151,11 +152,41 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     });
 
     const listRef = useRef<HTMLDivElement>(null);
-    const virtualizer = useWindowVirtualizer({
+    const virtualizer = useVirtualizer({
         count: sortedGroups.length,
-        estimateSize: () => 400,
-        overscan: 3,
+        getScrollElement: () => typeof document !== 'undefined' ? document.querySelector('main') : null,
+        estimateSize: () => 800,
+        overscan: 4,
     })
+
+    const timelinePoints = useMemo(() => {
+        const points: ScrubberPoint[] =[];
+        const seenYears = new Set<string>();
+        const seenYearMonths = new Set<string>();
+
+        sortedGroups.forEach(([dateString, items], index) => {
+            const date = new Date(items[0].dateTaken || items[0].createdAt);
+            const year = date.getFullYear().toString();
+            const month = date.toLocaleDateString('en-US', { month: 'short' });
+            const yearMonthKey = `${year}-${month}`;
+
+            if (!seenYears.has(year)) {
+                seenYears.add(year);
+                points.push({ label: year, month, index });
+            }
+
+            if (!seenYearMonths.has(yearMonthKey)) {
+                seenYearMonths.add(yearMonthKey);
+                points.push({ label: "", month, index });
+            }
+        });
+
+        return points;
+    }, [sortedGroups]);
+
+    const handleScrollToSection = (index: number) => {
+        virtualizer.scrollToIndex(index, { align: "start" });
+    };
 
     const toggleSelect = (id: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -253,7 +284,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                         const isAllSelected = isDateGroupAllSelected(items);
                         return (
                             <div key={date} data-index={virtualRow.index} ref={virtualizer.measureElement} className="absolute top-0 left-0 w-full pb-12" style={{ transform: `translateY(${virtualRow.start}px)` }}>
-                            <div className="flex items-center gap-2 mb-4 sticky top-0 py-2 bg-background/80 backdrop-blur-md z-10 group/date">
+                            <div className="flex items-center gap-2 mb-4 py-2.5 px-2 -mx-2 group/date">
                             <button onClick={(e) => toggleSelectDateGroup(items, e)} className={`transition-all duration-200 active:scale-90 ${isAllSelected ? 'opacity-100 text-orange-500' : 'opacity-0 group-hover/date:opacity-100 text-muted hover:text-foreground'}`}>
                                 <CheckCircle2 size={18} />
                             </button>
@@ -300,15 +331,10 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                 </div>
             )}
 
-            <div className="fixed right-4 top-24 bottom-12 w-6 hidden xl:flex flex-col items-center justify-between py-4 text-[11px] text-muted font-bold z-10 pointer-events-none">
-                <span>{startYear}</span>
-                <div className="flex-1 w-[1px] bg-surface-hover my-4 relative">
-                    <div className="absolute top-[25%] w-1.5 h-1.5 rounded-full bg-surface-hover -left-[2.5px]"></div>
-                    <div className="absolute top-[50%] w-1.5 h-1.5 rounded-full bg-surface-hover -left-[2.5px]"></div>
-                    <div className="absolute top-[75%] w-1.5 h-1.5 rounded-full bg-surface-hover -left-[2.5px]"></div>
-                </div>
-                <span>{endYear}</span>
-            </div>
+            {timelinePoints.length > 0 && (
+                <TimelineScrub points={timelinePoints} onScrollTo={handleScrollToSection} />
+            )}
+
             {selectedIndex !== null && (
                 <Lightbox items={mediaItems} index={selectedIndex} setIndex={(i: number) => setSelectedIndex(i)} onClose={() => setSelectedIndex(null)} albumId={albumId} isOwner={isOwner} allowDownload={allowDownload} />
             )}
