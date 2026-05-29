@@ -259,7 +259,7 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                         )}
                     </div>
                 </div>
-                <div className="flex-1 relative flex items-center justify-center group">
+                <div className="flex-1 relative flex items-center justify-center group min-h-0">
                     {index > 0 && (
                         <button onClick={goPrev} className="absolute left-6 p-3 rounded-full bg-background/5 text-foreground hover:bg-background/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                             <ChevronLeft size={32} />
@@ -272,7 +272,7 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                         <img 
                         key={item.id} 
                         src={`/api/media/${item.id}?size=large`} 
-                        className="max-w-full max-h-full object-contain select-none animate-in zoom-in-95 duration-300" 
+                        className="w-full h-full object-contain select-none animate-in zoom-in-95 duration-300" 
                         alt={item.filename} 
                     />
                     )}

@@ -303,6 +303,7 @@ export async function processMediaItem(mediaId: string) {
     const thumbnails: Record<string, string> = {};
     for (const [name, width] of Object.entries(sizes)) {
       const thumbBuffer = await sharp(thumbnailBuffer)
+        .rotate()
         .resize(width, null, { withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer();
