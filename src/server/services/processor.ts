@@ -7,9 +7,9 @@ import exifReader from "exif-reader";
 import { BUCKET_NAME, getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
 import { faces, media, mediaTags, tags, users, people } from "@/db/schema";
-import { eq, sql, and, ne } from "drizzle-orm";
+import { eq, sql, and, ne, inArray } from "drizzle-orm";
 import fs from "fs/promises";
-import { createReadStream } from "fs";
+import { createReadStream, createWriteStream} from "fs";
 import path from "path";
 import os from "os";
 import { redisCache } from "@/lib/cache";
@@ -70,11 +70,27 @@ export async function processMediaItem(mediaId: string) {
   const localInput = path.join(pipeDir, `original`);
 
   try {
-    if (!(await fileExists(localInput))) {
-      await client.fGetObject(bucket, item.objectKey, localInput);
-    }
+    let fileHash = "";
 
-    const fileHash = await calcFileHash(localInput);
+    if (!(await fileExists(localInput))) {
+      const objStream = await client.getObject(bucket, item.objectKey);
+      const hash = crypto.createHash('sha256');
+      const writeStream  = createWriteStream(localInput);
+      
+      await new Promise((resolve, reject) => {
+        objStream.on('data', (chunk) => {
+            hash.update(chunk);
+            writeStream.write(chunk);
+        });
+        objStream.on('end', () => writeStream.end());
+        writeStream.on('finish', () => resolve(null));
+        writeStream.on('error', reject);
+        objStream.on('error', reject);
+      });
+      fileHash = hash.digest('hex');
+    } else {
+      fileHash = await calcFileHash(localInput);
+    }
 
     const existingMedia = await db.query.media.findFirst({
         where: and(
@@ -419,21 +435,22 @@ export async function processAiIndexing(mediaId: string) {
       .where(eq(media.id, item.id));
 
       if (aiTags.length > 0) {
-        for (const tagName of aiTags) {
-          const existingsTags = await db.insert(tags)
-              .values({ ownerId: item.ownerId, name: tagName })
-              .onConflictDoNothing()
-              .returning({ id: tags.id });
-          
-          let tagId = existingsTags[0]?.id;
-          if (!tagId) {
-              const t = await db.query.tags.findFirst({ where: and(eq(tags.name, tagName), eq(tags.ownerId, item.ownerId)) });
-              if (t) tagId = t.id;
-          }
+          const tagValues = aiTags.map(name => ({ ownerId: item.ownerId, name }));
+          await db.insert(tags).values(tagValues).onConflictDoNothing();
 
-          if (tagId) {
-              await db.insert(mediaTags).values({ mediaId: item.id, tagId }).onConflictDoNothing();
-          }
+          const existingsTags = await db.query.tags.findMany({
+              where: and(
+                eq(tags.ownerId, item.ownerId),
+                inArray(tags.name, aiTags)
+              )
+          });
+          
+          if (existingsTags.length > 0) {
+            const mediaTagValues = existingsTags.map(t => ({
+                mediaId: item.id,
+                tagId: t.id,
+            }));
+            await db.insert(mediaTags).values(mediaTagValues).onConflictDoNothing();
         }
       }
 
