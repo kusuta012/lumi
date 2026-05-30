@@ -21,7 +21,7 @@ export async function recordMediaUpload(data: {
     try {
         const sizeInMB = data.size > 0 ? Math.max(1, Math.round(data.size / (1024 * 1024))) : 0;
         await db.transaction(async (tx) => {
-            const [newMedia] = await db.insert(media).values({
+            const [newMedia] = await tx.insert(media).values({
                 ownerId: session.user.id,
                     filename: data.filename,
                     mimetype: data.mimetype,

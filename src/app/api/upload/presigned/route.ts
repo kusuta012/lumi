@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
         const fileId = crypto.randomUUID();
         const ext = filename.split(`.`).pop();
-        const objectKey = `users/${session.user.id}/${fileId}-${ext}}`;
+        const objectKey = `users/${session.user.id}/${fileId}-${ext}`;
         const presignedUrl = await client.presignedPutObject(bucket, objectKey, 3600);
 
         return NextResponse.json({ presignedUrl, objectKey, backendId: defaultBackend?.id || null });

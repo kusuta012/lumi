@@ -46,6 +46,15 @@ async function calcFileHash(filePath: string): Promise<string> {
   })
 }
 
+async function fileExists(filePath: string) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function processMediaItem(mediaId: string) {
   const item = await db.query.media.findFirst({
     where: eq(media.id, mediaId),
@@ -56,12 +65,16 @@ export async function processMediaItem(mediaId: string) {
   const { client, bucket } = getStorageClient(item?.storageBackend?.config);
 
   const isVideo = item.mimetype.startsWith("video/");
-  const tempInput = path.join(os.tmpdir(), `lumi-metadata-${item.id}`);
+  const pipeDir = path.join(os.tmpdir(), `lumi-pipe-${item.id}`);
+  await fs.mkdir(pipeDir, { recursive: true });
+  const localInput = path.join(pipeDir, `original`);
 
   try {
-    await client.fGetObject(bucket, item.objectKey, tempInput);
+    if (!(await fileExists(localInput))) {
+      await client.fGetObject(bucket, item.objectKey, localInput);
+    }
 
-    const fileHash = await calcFileHash(tempInput);
+    const fileHash = await calcFileHash(localInput);
 
     const existingMedia = await db.query.media.findFirst({
         where: and(
@@ -94,6 +107,7 @@ export async function processMediaItem(mediaId: string) {
           .where(eq(users.id, item.ownerId));
       await client.removeObject(bucket, item.objectKey);
       await redisCache.del(`user_photos_timeline:${item.ownerId}`);
+      await fs.rm(pipeDir, { recursive: true, force: true });
       return;
     }
 
@@ -106,7 +120,7 @@ export async function processMediaItem(mediaId: string) {
     let gpsLng: number | null = null;
 
     if (isVideo) {
-      const stats = await fs.stat(tempInput);
+      const stats = await fs.stat(localInput);
       if (stats.size === 0) {
         throw new Error(`0 bytes file, check minio connection`)
       }
@@ -118,7 +132,7 @@ export async function processMediaItem(mediaId: string) {
         "stream=width,height,codec_type,codec_name:format=duration",
         "-of",
         "json",
-        tempInput,
+        localInput,
       ]);
 
       const metadata = JSON.parse(probeData);
@@ -131,7 +145,7 @@ export async function processMediaItem(mediaId: string) {
       height = Number(videoStream.height) || 0;
       duration = metadata.format.duration ? parseFloat(metadata.format.duration) : 0;
     } else {
-      const imageBuffer = await fs.readFile(tempInput);
+      const imageBuffer = await fs.readFile(localInput);
       try {
             const pipeline = sharp(imageBuffer);
             const metadata = await pipeline.metadata();
@@ -172,6 +186,7 @@ export async function processMediaItem(mediaId: string) {
                 .where(eq(users.id, item.ownerId));
               await db.delete(media).where(eq(media.id, item.id));
               await client.removeObject(BUCKET_NAME, item.objectKey);
+              await fs.rm(pipeDir, { recursive: true, force: true });
               return;
             }
           }
@@ -194,10 +209,9 @@ export async function processMediaItem(mediaId: string) {
           await thumbnailQueue.add("generate-thumbs", { mediaId });
     } catch (err) {
       console.error(`error extracting metadata ${item.id}`, err)
+      await fs.rm(pipeDir, { recursive: true, force: true });
       throw err;
-    } finally {
-      try { await fs.unlink(tempInput); } catch (e) {}
-    }
+    } 
   }
   export async function processThumbnails(mediaId: string) {
     const item = await db.query.media.findFirst({
@@ -208,11 +222,15 @@ export async function processMediaItem(mediaId: string) {
     if (!item || !ffmpegPath || !ffprobePath) return;
     const { client, bucket } = getStorageClient(item?.storageBackend?.config)
     const isVideo = item.mimetype.startsWith("video/");
-    const tempInput = path.join(os.tmpdir(), `lumi-thumbs-${item.id}`);
-    const tempHlsDir = path.join(os.tmpdir(), `lumi-hls-gen-${item.id}`);
+    const pipeDir = path.join(os.tmpdir(), `lumi-pipe-${item.id}`);
+    await fs.mkdir(pipeDir, { recursive: true });
+    const localInput = path.join(pipeDir, `original`);
+    const tempHlsDir = path.join(pipeDir, `hls-gen`);
 
     try {
-      await client.fGetObject(bucket, item.objectKey, tempInput);
+      if (!(await fileExists(localInput))) {
+        await client.fGetObject(bucket, item.objectKey, localInput);
+      }
       let thumbnailBuffer: Buffer;
       let hoverSpriteKey: string | null = null;
       let hlsPlaylistKey: string | null = null;
@@ -224,7 +242,7 @@ export async function processMediaItem(mediaId: string) {
             "-ss",
             "00:00:01",
             "-i",
-            tempInput,
+            localInput,
             "-vframes",
             "1",
             "-an",
@@ -242,7 +260,7 @@ export async function processMediaItem(mediaId: string) {
         try {
           const spriteOutput = path.join(os.tmpdir(), `sprite-${item.id}.webp`);
           await execa(ffmpegPath, [
-            "-y", "-i", tempInput,
+            "-y", "-i", localInput,
             "-t", "3",
             "-vf", "fps=5,scale=320:-1:flags=lanczos",
             "-vcodec", "libwebp", "-lossless", "0", "-q:v", "60", "-loop", "0", "-an",
@@ -262,7 +280,7 @@ export async function processMediaItem(mediaId: string) {
           "stream=codec_name",
           "-of",
           "json",
-          tempInput,
+          localInput,
         ]);
         const codec = JSON.parse(probeData)?.streams?.[0]?.codec_name || "";
         const isHevc = codec === "hevc" || codec === "h265" || codec === "prores";
@@ -272,7 +290,7 @@ export async function processMediaItem(mediaId: string) {
         if (isHevc || isLarge || isLong) {
           await fs.mkdir(tempHlsDir, { recursive: true });
           await execa(ffmpegPath, [
-              "-y", "-i", tempInput,
+              "-y", "-i", localInput,
               "-c:v", "libx264", "-crf", "23", "-preset", "veryfast",
               "-vf", "scale=-2:720",
               "-c:a", "aac", "-b:a", "128k", "-ac", "2",
@@ -296,7 +314,7 @@ export async function processMediaItem(mediaId: string) {
           }
         }
       } else {
-        thumbnailBuffer = await fs.readFile(tempInput);
+        thumbnailBuffer = await fs.readFile(localInput);
       }
 
     const sizes = { small: 300, medium: 720, large: 1440 };
@@ -307,6 +325,10 @@ export async function processMediaItem(mediaId: string) {
         .resize(width, null, { withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer();
+      
+      if (name === "small") {
+          await fs.writeFile(path.join(pipeDir, "small.webp"), thumbBuffer)
+      }
 
       const thumbKey = `thumbs/${item.ownerId}/${item.id}-${name}.webp`;
       await client.putObject(
@@ -328,10 +350,8 @@ export async function processMediaItem(mediaId: string) {
     
     await aiQueue.add("ai-index", {mediaId});
   } catch (err) { console.error(`thumbnail gen error for ${item.id}`, err);
+    await fs.rm(pipeDir, { recursive: true, force: true });
     throw err;
-  } finally {
-    try { await fs.unlink(tempInput); } catch (e) {}
-    try { await fs.rm(tempHlsDir, { recursive: true, force: true }); } catch (e) {}
   }
 }
 
@@ -343,6 +363,8 @@ export async function processAiIndexing(mediaId: string) {
 
   if (!item) return;
   const { client, bucket } = getStorageClient(item?.storageBackend?.config);
+  const pipeDir = path.join(os.tmpdir(), `lumi-pipe-${item.id}`);
+  const localInput = path.join(pipeDir, `small.webp`);
 
   try {
     let clipEmbedding: number[] | null = null;
@@ -350,15 +372,19 @@ export async function processAiIndexing(mediaId: string) {
     let aiTags: string[] = [];
     let detectedFaces: any[] = [];
     let extractedText: string | null = null;
+    const isVideo = item.mimetype.startsWith("video/")
 
-    const isVideo = item.mimetype.startsWith("video/") 
-    const thumbKey = (item.thumbnails as any)?.small || item.objectKey;
-    const stream = await client.getObject(bucket, thumbKey);
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-    }
-    const buffer = Buffer.concat(chunks);
+    let buffer: Buffer;
+
+    if (await fileExists(localInput)) {
+        buffer = await fs.readFile(localInput);
+    } else {
+        const thumbKey = (item.thumbnails as any)?.small || item.objectKey;
+        const stream = await client.getObject(bucket, thumbKey);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+        buffer = Buffer.concat(chunks);
+      }
 
     try {
       const formData = new FormData();
@@ -457,5 +483,7 @@ export async function processAiIndexing(mediaId: string) {
     } catch (err) {
       console.error(`AI processing erorr for ${item.id}`, err);
       throw err;
+    } finally {
+      try { await fs.rm(pipeDir, { recursive: true, force: true }); } catch (e) {}
     }
   }
