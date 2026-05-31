@@ -222,7 +222,9 @@ export async function processMediaItem(mediaId: string) {
             .where(eq(media.id, item.id));
 
           await redisCache.del(`user_photos_timeline:${item.ownerId}`);
+          await redisCache.del(`media_meta${mediaId}`);
           await thumbnailQueue.add("generate-thumbs", { mediaId });
+          
     } catch (err) {
       console.error(`error extracting metadata ${item.id}`, err)
       await fs.rm(pipeDir, { recursive: true, force: true });
