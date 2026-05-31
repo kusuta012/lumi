@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, real, primaryKey, index, customType } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, real, primaryKey, index, customType, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 const clipVector = customType<{ data: number[]; driverData: string }>({
@@ -121,7 +121,9 @@ export const media = pgTable('media', {
 }, (table) => [
     index('media_timeline_idx').on(table.ownerId, table.isDeleted, table.isArchived, table.isLocked),
     index('media_date_idx').on(table.dateTaken, table.createdAt),
-    index('media_hash_idx').on(table.hash)
+    index('media_hash_idx').on(table.hash),
+    index('media_favorites.idx').on(table.ownerId, table.isFavorited),
+    index('media_hnsw_idx').using('hnsw', table.clipEmbedding.op('vector_cosine_ops'))
 ]);
 
 export const albums = pgTable('albums', {
@@ -150,7 +152,9 @@ export const tags = pgTable('tags', {
     id: uuid('id').defaultRandom().primaryKey(),
     ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
     name: text('name').notNull(),
-});
+}, (table) => [
+    uniqueIndex('tags_owner_name_uidx').on(table.ownerId, table.name)
+]);
 
 export const mediaTags = pgTable('media_tags', {
     mediaId: uuid('media_id').references(() => media.id, { onDelete: 'cascade' }).notNull(),
@@ -223,7 +227,8 @@ export const faces = pgTable('faces', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
     index('faces_media_idx').on(table.mediaId),
-    index('faces_person_idx').on(table.personId)
+    index('faces_person_idx').on(table.personId),
+    index('faces_embedding_hnsw_idx').using('hnsw', table.faceEmbedding.op('vector_cosine_ops'))
 ]);
 
 export const peopleRelations = relations(people, ({ one, many }) => ({
