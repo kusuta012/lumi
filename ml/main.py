@@ -8,26 +8,38 @@ import requests
 from PIL import Image
 import io
 import torch
-from transformers import CLIPProcessor, CLIPModel, ViTImageProcessor, ViTForImageClassification
+from transformers import CLIPProcessor, ViTImageProcessor
 from insightface.app import FaceAnalysis
 import easyocr
+import os
+
+cores_c = min(4, os.cpu_count() or 4)
+torch.set_num_threads(cores_c)
 
 
 app = FastAPI(title="Lumi")
 print("loading ai")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device.upper()}")
-
-clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16").to(device)
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
-
 vit_processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
-vit_model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224').to(device)
 
-face_analysis = FaceAnalysis(name='buffalo_sc', root='.', provider=['CPUExecutionProvider'])
+if device == "cuda":
+    from transformers import CLIPModel, ViTForImageClassification
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16").to(device)
+    vit_model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224').to(device)
+
+else: 
+    from transformers import CLIPModel
+    from optimum.onnxruntime import ORTModelForFeatureExtraction, ORTModelForImageClassification
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16")
+    vit_model = ORTModelForImageClassification.from_pretrained("google/vit-base-patch16-224", export=True)
+
+onnx_providers = ['CUDAExecutionProvider'] if device == "cuda" else ['CPUExecutionProvider']
+face_analysis = FaceAnalysis(name='buffalo_sc', root='.', providers=onnx_providers)
 face_analysis.prepare(ctx_id=0, det_size=(640, 640))
 
-reader = easyocr.Reader(['en'], gpu=torch.cuda.is_available())
+reader = easyocr.Reader(['en'], gpu=(device == "cuda"))
 
 print("ai models loaded")
 
@@ -42,16 +54,9 @@ def hl_check():
 def encode_text(req: TextRequest):
     try:
         inputs = clip_processor(text=[req.text], return_tensors="pt", padding=True).to(device)
-        with torch.no_grad():
-            text_outputs = clip_model.get_text_features(**inputs)
-            pooled_output = text_outputs.pooler_output
-
-            if pooled_output.shape[-1] == 512:
-                text_features = pooled_output
-            else:
-                text_features = clip_model.text_projection(pooled_output)
-
-            text_features = text_features / text_features.norm(p=2, dim=-1, keepdim=True)
+        with torch.inference_mode():
+            text_features = clip_model. get_text_features(**inputs)
+            text_features = text_features / text_features.norm(p=2, dim=-1, keepdim=True)  
 
         return {"embedding": text_features[0].cpu().numpy().tolist()}
     except Exception as e:
@@ -68,23 +73,23 @@ async def analyze_image(file: UploadFile = File(...)):
         blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
 
         clip_inputs = clip_processor(images=pil_image, return_tensors="pt").to(device)
-        with torch.no_grad():
-            vision_outputs = clip_model.get_image_features(**clip_inputs)
-            pooled_output = vision_outputs.pooler_output
+        with torch.inference_mode():
+            image_features = clip_model.get_image_features(**clip_inputs)
+            image_features = image_features / image_features.norm(p=2, dim=-1, keepdim=True) 
 
-            if pooled_output.shape[-1] == 512:
-                image_features = pooled_output
-            else:
-                image_features = clip_model.visual_projection(pooled_output)
-
-            image_features = image_features / image_features.norm(p=2, dim=-1, keepdim=True)
-        
         clip_embedding = image_features[0].cpu().numpy().tolist()
 
-        vit_inputs = vit_processor(images=pil_image, return_tensors="pt").to(device)
-        with torch.no_grad():
+        vit_inputs = vit_processor(images=pil_image, return_tensors="pt")
+
+        if device == "cuda":
+            vit_inputs = vit_inputs.to(device)
+            with torch.inference_mode():
+                vit_outputs = vit_model(**vit_inputs)
+                logits = vit_outputs.logits
+        else:
             vit_outputs = vit_model(**vit_inputs)
-        logits = vit_outputs.logits
+            logits = vit_outputs.logits
+
         probs = logits.softmax(dim=-1)[0]
         top_probs, top_indices = probs.topk(5)
         tags = []
@@ -98,7 +103,7 @@ async def analyze_image(file: UploadFile = File(...)):
         detected_faces = face_analysis.get(cv_image)
 
         for face in detected_faces:
-            if face.det_score > 0.60:
+            if face.det_score > 0.70:
                 x1, y1, x2, y2 = face.bbox
                 embedding = face.normed_embedding if hasattr(face, "normed_embedding") else face.embedding
 
