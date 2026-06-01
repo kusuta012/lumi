@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from '@/server/auth';
 import { getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
-import { users, storageBackends } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { users, storageBackends, media } from "@/db/schema";
+import { eq, sql, and } from "drizzle-orm";
 
 const prepUserCheck = db.select({
     storageUsed: users.storageUsed,
@@ -18,9 +18,41 @@ export async function POST(req: Request) {
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401});
 
     try {
-        const { filename, fileSize, contentType } = await req.json();
+        const { filename, fileSize, contentType, fileHash } = await req.json();
         if (!contentType?.startsWith("image/") && !contentType?.startsWith("video/")) {
             return NextResponse.json({ error: "invalid file type. Only images and video are allowed."}, { status: 400 });
+        }
+        
+        if (fileHash) {
+            const existingMedia = await db.query.media.findFirst({
+                where: and(
+                    eq(media.hash, fileHash),
+                    eq(media.ownerId, session.user.id)
+                )
+            });
+
+            if (existingMedia) {
+                const [newMedia] = await db.insert(media).values({
+                    ownerId: session.user.id,
+                    filename: filename,
+                    mimetype: existingMedia.mimetype,
+                    size: existingMedia.size,
+                    objectKey: existingMedia.objectKey,
+                    hash: existingMedia.hash,
+                    thumbnails: existingMedia.thumbnails,
+                    storageBackendId: existingMedia.storageBackendId,
+                    clipEmbedding: existingMedia.clipEmbedding,
+                    extractedText: existingMedia.extractedText,
+                    hoverSpriteKey: existingMedia.hoverSpriteKey,
+                    hlsPlaylistKey: existingMedia.hlsPlaylistKey,
+                    blurScore: existingMedia.blurScore
+                }).returning({ id: media.id });
+                return NextResponse.json({
+                    isDuplicate: true,
+                    mediaId: newMedia.id,
+                    message: "File duplicated"
+                });
+            }
         }
        
         const [user] = await prepUserCheck.execute({ userId: session.user.id });

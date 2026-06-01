@@ -5,6 +5,13 @@ import { recordMediaUpload } from "@/server/actions/media";
 import { UploadCloud } from "lucide-react";
 import { useNotification } from "../providers/NotificationProvider";
 
+async function calculateFileHash(file: File): Promise<string> {
+    const arrayBuffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default function UploadButton() {
     const { notify } = useNotification();
     const [loading, setLoading] = useState(false);
@@ -18,6 +25,7 @@ export default function UploadButton() {
         try {
             let successCount = 0;
             let skippedCount = 0;
+            let duplicatedCount = 0;
             for (let i = 0; i < totalFiles; i++) {
                 const file = files[i];
                 if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
@@ -25,11 +33,11 @@ export default function UploadButton() {
                     continue;
                 }
                 setProgress(`Uploading ${i + 1}/${totalFiles}....`);
-
+                const fileHash = await calculateFileHash(file);
                 const res = await fetch("/api/upload/presigned", {
                     method: "POST",
-                    headers: { "Content-Type": "applications/json" },
-                    body: JSON.stringify({ filename: file.name, contentType: file.type, fileSize: file.size }),
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ filename: file.name, contentType: file.type, fileSize: file.size, fileHash }),
                 });
 
                 if (!res.ok) {
@@ -37,7 +45,16 @@ export default function UploadButton() {
                     throw new Error(errData.message || `Failed to get upload URL for ${file.name}`);
                 }
 
-                const { presignedUrl, objectKey, backendId } = await res.json();
+                const { presignedUrl, objectKey, backendId, isDuplicate } = await res.json();
+                
+                if (isDuplicate) {
+                    successCount++;
+                    duplicatedCount++;
+                    continue;
+                }
+
+                setProgress(`Uploading ${i + 1}/${totalFiles}...`);
+
                 const uploadRes = await fetch(presignedUrl, {
                     method: "PUT",
                     body: file,
@@ -45,7 +62,7 @@ export default function UploadButton() {
                 });
 
                 if (!uploadRes.ok) {
-                    throw new Error(`failed to upload ${file.name} to nucket`);
+                    throw new Error(`failed to upload ${file.name} to bucket`); // I have made so many typos ;-;
                 }
 
                 await recordMediaUpload({
@@ -58,11 +75,14 @@ export default function UploadButton() {
                 successCount++;
             }
 
-            if (successCount > 0) notify("success", "Upload Complete", `successfully uploaded ${successCount} files`);
+            if (successCount > 0) {
+                const dupmsg = duplicatedCount > 0 ? ` (${duplicatedCount} duplicates) ` : "";
+                notify("success", "Upload Complete", `successfully uploaded ${successCount} files${dupmsg}`); 
+            }
             if (skippedCount > 0) notify("info", "Files Skipped", `${skippedCount} files were skipped (unsupported format)`);
         } catch (err: any) {
             console.error("batch upload failed", err);
-            notify("error", "Upload Failed", err.message || "unknown erorr");
+            notify("error", "Upload Failed", err.message || "unknown error");
         } finally {
             setLoading(false);
             setProgress("");

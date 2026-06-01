@@ -59,7 +59,10 @@ export async function GET(
             contentType = hlsFile.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp2t";
         }
 
-        else if (size === "sprite" && item.hoverSpriteKey) {
+        else if (size === "sprite") {
+            if (!item.hoverSpriteKey) {
+                return new NextResponse("Sprite not generated", { status: 404 });
+            }
             objectKey = item.hoverSpriteKey;
             contentType = "image/webp";
         }
@@ -101,11 +104,15 @@ export async function GET(
             }); 
         } catch (err: any) {
             if (err.code === 'NoSuchKey' && size !== "original" && !hlsFile) {
+                if (item.mimetype.startsWith("video/")) {
+                    return new NextResponse("Video thumbnail processing", { status: 404 });
+                }
+
                 const fallbackStream = await client.getObject(bucket, item.objectKey);
                 return new NextResponse(fallbackStream as any, {
                     headers: {
                         "Content-Type": item.mimetype,
-                        "Cache-Control": "public, max-age=31536000, immutable",
+                        "Cache-Control": "no-store, must-revalidate",
                     },
                 });
             }
