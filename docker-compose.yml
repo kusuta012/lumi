@@ -11,6 +11,26 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  pgbouncer:
+    image: bitnami/pgbouncer:latest
+    container_name: lumi-dev-pgbouncer-1
+    restart: unless-stopped
+    ports:
+      - "6432:6432"
+    environment:
+      POSTGRESQL_HOST: "postgres"
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: "lumi"
+      POSTGRESQL_PASSWORD: "iykykoknoyes"
+      POSTGRESQL_DATABASE: "lumi"
+      PGBOUNCER_POOL_MODE: "transaction"
+      PGBOUNCER_MAX_CLIENT_CONN: "2000"
+      PGBOUNCER_IGNORE_STARTUP_PARAMETERS: "extra_float_digits"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
   redis:
     image: redis:latest
     ports:
@@ -61,6 +81,7 @@ services:
       AUTH_SECRET: "d420be4dba7f4f8938595feb956cb8d423c580026904435ce76ecab8568c4074"
     depends_on:
       - postgres
+      - pgbouncer
       - redis
       - minio
       - ml
