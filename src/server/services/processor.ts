@@ -308,7 +308,8 @@ export async function processMediaItem(mediaId: string) {
         if (isHevc || isLarge || isLong) {
           await fs.mkdir(tempHlsDir, { recursive: true });
           await execa(ffmpegPath, [
-              "-y", "-i", localInput,
+              "-y", "-hwaccel", "auto",
+              "-i", localInput,
               "-c:v", "libx264", "-crf", "23", "-preset", "veryfast",
               "-vf", "scale=-2:720",
               "-c:a", "aac", "-b:a", "128k", "-ac", "2",
@@ -461,8 +462,10 @@ export async function processAiIndexing(mediaId: string) {
             const embeddingStr = `[${face.embedding.join(',')}]`;
             const result = await db.execute(sql`
                 SELECT person_id, (face_embedding <=> ${embeddingStr}::vector) AS distance
-                FROM ${faces}
+                FROM ${faces} f
+                INNER JOIN ${people} p ON f.person_id = p.id
                 WHERE face_embedding is NOT NULL
+                  AND p.owner_id = ${item.ownerId}::uuid
                 ORDER BY distance ASC
                 LIMIT 1    
             `);

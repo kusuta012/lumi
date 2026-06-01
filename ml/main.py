@@ -12,6 +12,7 @@ from transformers import CLIPProcessor, ViTImageProcessor
 from insightface.app import FaceAnalysis
 import easyocr
 import os
+import asyncio
 
 cores_c = min(4, os.cpu_count() or 4)
 torch.set_num_threads(cores_c)
@@ -72,6 +73,35 @@ async def analyze_image(file: UploadFile = File(...)):
         gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
         blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
 
+        def extract_faces():
+            faces_data = []
+            detected_faces = face_analysis.get(cv_image)
+
+            for face in detected_faces:
+                if face.det_score > 0.70:
+                    x1, y1, x2, y2 = face.bbox
+                    embedding = face.normed_embedding if hasattr(face, "normed_embedding") else face.embedding
+
+                    faces_data.append({
+                        "boundingBox": {"x": float(x1), "y": float(y1), "w": float(x2 - x1), "h": float(y2 - y1)},
+                        "embedding": embedding.tolist()
+                    })
+            return faces_data
+        
+        def extract_ocr():
+            max_ocr_sz = 640
+            h, w = cv_image.shape[:2]
+            if max(h, w) > max_ocr_sz:
+                scale = max_ocr_sz / max(h, w)
+                ocr_img = cv2.resize(cv_image, (int(w * scale), int(h * scale)))
+            else:
+                ocr_img = cv_image
+            ocr_results = reader.readtext(ocr_img, detail=0, contrast_ths=0.1, paragraph=True)
+            return " ".join(ocr_results)
+
+        faces_task = asyncio.to_thread(extract_faces)
+        ocr_task = asyncio.to_thread(extract_ocr)
+
         clip_inputs = clip_processor(images=pil_image, return_tensors="pt").to(device)
         with torch.inference_mode():
             image_features = clip_model.get_image_features(**clip_inputs)
@@ -98,31 +128,9 @@ async def analyze_image(file: UploadFile = File(...)):
                 label = vit_model.config.id2label[idx.item()].split(",")[0].lower()
                 tags.append(label)
 
-
-        faces_data = []
-        detected_faces = face_analysis.get(cv_image)
-
-        for face in detected_faces:
-            if face.det_score > 0.70:
-                x1, y1, x2, y2 = face.bbox
-                embedding = face.normed_embedding if hasattr(face, "normed_embedding") else face.embedding
-
-                faces_data.append({
-                    "boundingBox": {"x": float(x1), "y": float(y1), "w": float(x2 - x1), "h": float(y2 - y1)},
-                    "embedding": embedding.tolist()
-                })
+        faces_data = await faces_task
+        extracted_text = await ocr_task
         
-        max_ocr_sz = 640
-        h, w = cv_image.shape[:2]
-        if max(h, w) > max_ocr_sz:
-            scale = max_ocr_sz / max(h, w)
-            ocr_img = cv2.resize(cv_image, (int(w * scale), int(h * scale)))
-        else:
-            ocr_img = cv_image
-
-        ocr_results = reader.readtext(ocr_img, detail=0, contrast_ths=0.1, paragraph=True)
-        extracted_text = " ".join(ocr_results)
-
         return {
             "blurScore": float(blur_score),
             "clipEmbedding": clip_embedding,
