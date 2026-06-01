@@ -3,14 +3,21 @@ import { media } from "@/db/schema";
 import { sql, and, eq, ilike } from "drizzle-orm";
 import { env } from "@/lib/env";
 import { NextResponse } from "next/server";
+import { auth } from "@/server/auth"
 
 export async function POST(req: Request) {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const  userId = session.user.id
+
     try {
         const body = await req.json();
-        const { searchQuery, userId, mode = "context" } = body;
+        const { searchQuery, mode = "context" } = body;
 
-        if (!searchQuery || !userId ) {
-            return NextResponse.json({ error: "Missing searchQuery or UserId" }, { status: 400 });
+        if (!searchQuery) {
+            return NextResponse.json({ error: "Missing searchQuery" }, { status: 400 });
         }
 
         let results = [];
