@@ -43,3 +43,27 @@ export const redisCache = {
         }
     }
 };
+
+export const cacheInvalid = {
+    async onMediaChanged(userId: string, mediaId?: string, hasGps: boolean = false) {
+        const keys = [
+            `user_photos_timeline:${userId}`,
+            `user_explore_highlight:${userId}`,
+            `user_explore_memories:${userId}`
+        ];
+        if (mediaId) keys.push(`media_meta:${mediaId}`);
+        if (hasGps) keys.push(`user_locations:${userId}`);
+
+        await Promise.allSettled(keys.map(key => redisCache.del(key)));
+    },
+    async onAlbumChanged(userId: string) {
+        await redisCache.del(`user_albums_grid:${userId}`);
+    },
+    async onAimetaChanged(userId: string) {
+        const keys = [
+            `user_explore_people:${userId}`,
+            `user_explore_categories:${userId}`
+        ];
+        await Promise.allSettled(keys.map(key => redisCache.del(key)));
+    }
+};

@@ -6,7 +6,7 @@ import { eq, and, inArray, notInArray, sql, count, lt } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { getStorageClient } from "@/lib/storage";
-import { redisCache } from "@/lib/cache";
+import { redisCache, cacheInvalid } from "@/lib/cache";
 import { subDays } from "date-fns";
 
 async function verifyOwnership(mediaId: string) {
@@ -24,8 +24,7 @@ export async function toggleFavoriteAction(
     .update(media)
     .set({ isFavorited: !currentStatus })
     .where(and(eq(media.id, mediaId), eq(media.ownerId, userId)));
-  await redisCache.del(`user_photos_timeline:${userId}`);  
-
+    await cacheInvalid.onMediaChanged(userId, mediaId)
   revalidatePath("/favorites");
   revalidatePath("/photos");
 }
@@ -39,7 +38,7 @@ export async function toggleArchiveAction(
     .update(media)
     .set({ isArchived: !currentStatus })
     .where(and(eq(media.id, mediaId), eq(media.ownerId, userId)));
-  await redisCache.del(`user_photos_timeline:${userId}`); 
+  await cacheInvalid.onMediaChanged(userId, mediaId)
   revalidatePath("/archive");
   revalidatePath("/photos");
 }
@@ -56,8 +55,7 @@ export async function toggleTrashAction(
       deletedAt: !currentStatus ? new Date() : null,
     })
     .where(and(eq(media.id, mediaId), eq(media.ownerId, userId)));
-  await redisCache.del(`user_photos_timeline:${userId}`);
-  await redisCache.del(`user_locations:${userId}`)
+  await cacheInvalid.onMediaChanged(userId, mediaId, true);
   revalidatePath("/trash");
   revalidatePath("/photos");
   revalidatePath("/albums", "layout");
@@ -74,8 +72,7 @@ export async function restoreMediaAction(mediaIds: string[]) {
       and(inArray(media.id, mediaIds), eq(media.ownerId, session.user.id)),
     );
 
-  await redisCache.del(`user_photos_timeline:${session.user.id}`);
-  await redisCache.del(`user_locations:${session.user.id}`) 
+  await cacheInvalid.onMediaChanged(session.user.id, undefined, true);
   revalidatePath("/trash");
   revalidatePath("/photos");
   return { success: true };
@@ -98,11 +95,8 @@ export async function deletePermanentlyAction(mediaIds: string[]) {
   const verifiedIds = items.map(i => i.id);
   const result = await purgeMediaItemsSys(verifiedIds, session.user.id);
   if (result.success) {
-    await redisCache.del(`user_photos_timeline:${session.user.id}`);
-    await redisCache.del(`user_locations:${session.user.id}`);
-    for (const id of verifiedIds) {
-      await redisCache.del(`media_meta:${id}`)
-    }
+    await cacheInvalid.onMediaChanged(session.user.id, undefined, true);
+    await Promise.allSettled(verifiedIds.map(id => cacheInvalid.onMediaChanged(session.user.id, id)));
   }
 
   return result;
@@ -120,8 +114,7 @@ export async function bulkMoveToTrashAction(mediaIds: string[]) {
     .where(
       and(inArray(media.id, mediaIds), eq(media.ownerId, session.user.id)),
     );
-  await redisCache.del(`user_photos_timeline:${session.user.id}`);
-  await redisCache.del(`user_locations:${session.user.id}`)
+  await cacheInvalid.onMediaChanged(session.user.id, undefined, true);
   revalidatePath("/photos");
   revalidatePath("/albums", "layout");
   return { success: true };
@@ -224,8 +217,8 @@ export async function cleanExpiredTrash() {
 
     for (const [ownerId, ids] of Object.entries(itemsByOwner)) {
       await purgeMediaItemsSys(ids, ownerId);
-      await redisCache.del(`user_photos_timeline:${ownerId}`);
-      await redisCache.del(`user_locations:${ownerId}`);
+      await cacheInvalid.onMediaChanged(ownerId, undefined, true);
+      await Promise.allSettled(ids.map(id => cacheInvalid.onMediaChanged(ownerId, id)));
     }
   } catch (err) {
     console.error("trash clean failed", err);
@@ -266,7 +259,7 @@ export async function addTags(mediaId: string, tagName: string) {
     });
     if (!item) return { success: false, error: "media not found" };
 
-    const currentTagsCnt = await db.select({ count: sql`count(*)::int` })
+    const currentTagsCnt = await db.select({ count: sql<number>`count(*)::int` })
       .from(mediaTags)
       .where(eq(mediaTags.mediaId, mediaId));
 
@@ -293,7 +286,8 @@ export async function addTags(mediaId: string, tagName: string) {
       mediaId,
       tagId
     }).onConflictDoNothing();
-  
+    
+    await cacheInvalid.onAimetaChanged(session.user.id);
     return { success: true, tag: { id: tagId, name: cleanTagName }};
   } catch (err) {
     console.error("failed to add tag", err);
@@ -313,7 +307,7 @@ export async function removeTag(mediaId: string, tagId: string) {
 
     await db.delete(mediaTags)
       .where(and(eq(mediaTags.mediaId, mediaId), eq(mediaTags.tagId, tagId)));
-
+    await cacheInvalid.onAimetaChanged(session.user.id);
     return { success: true };
   } catch (err) {
     console.error("failed to remove tag", err);
@@ -337,7 +331,7 @@ export async function bulkAddTags(mediaIds: string[], tagNames: string[]) {
           const cleanName = name.trim().toLowerCase();
           if (!cleanName) continue;
 
-          const currentTagsCnt = await tx.select({ count: sql`count(*)::int` })
+          const currentTagsCnt = await tx.select({ count: sql<number>`count(*)::int` })
             .from(mediaTags)
             .where(eq(mediaTags.mediaId, mediaId));
           
@@ -361,7 +355,7 @@ export async function bulkAddTags(mediaIds: string[], tagNames: string[]) {
           }
         }
     });
-
+    await cacheInvalid.onAimetaChanged(session.user.id);
     return { success: true };
   } catch (err) {
     console.error("bulk tagging failed", err);

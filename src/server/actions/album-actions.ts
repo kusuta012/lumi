@@ -6,7 +6,7 @@ import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { addMediaToPipe } from "@/lib/queue";
-import { redisCache } from "@/lib/cache";
+import { cacheInvalid } from "@/lib/cache";
 import { logAuditEvent } from "@/lib/audit";
 
 
@@ -28,7 +28,7 @@ export async function addToAlbumAction(mediaIds: string[], albumName: string) {
 
         await db.insert(albumMedia).values(entries);
 
-        await redisCache.del(`user_albums_grid:${session.user.id}`);
+        await cacheInvalid.onAlbumChanged(session.user.id);
         revalidatePath("/albums");
         revalidatePath("/photos");
 
@@ -49,7 +49,7 @@ export async function createEmptyAlbumAction(name: string) {
             ownerId: session.user.id,
             coverMediaId: null,
         }).returning();
-        await redisCache.del(`user_albums_grid:${session.user.id}`);
+        await cacheInvalid.onAlbumChanged(session.user.id);
         revalidatePath("/albums");
         return { success: true, albumId: newAlbum.id};
     } catch (error) {
@@ -71,7 +71,7 @@ export async function addMediaToExistingAlbumAction(albumId: string, mediaIds: s
         if (!album.coverMediaId && mediaIds.length > 0) {
             await db.update(albums).set({ coverMediaId: mediaIds[0] }).where(eq(albums.id, albumId));
         }
-        await redisCache.del(`user_albums_grid:${session.user.id}`);
+        await cacheInvalid.onAlbumChanged(session.user.id);
         revalidatePath("/albums");
         revalidatePath(`/albums/${albumId}`);
         return { success: true };
@@ -90,7 +90,7 @@ export async function deleteAlbumAction(albumId: string) {
             await tx.delete(albumMedia).where(eq(albumMedia.albumId, albumId));
             await tx.delete(albums).where(and(eq(albums.id, albumId), eq(albums.ownerId, session.user.id)));
         });
-        await redisCache.del(`user_albums_grid:${session.user.id}`);
+        await cacheInvalid.onAlbumChanged(session.user.id);
         await logAuditEvent(
             "album_deleted",
             "album",
@@ -118,7 +118,7 @@ export async function updateAlbumAction(albumId: string, data: { name?: string, 
             })
             .where(and(eq(albums.id, albumId), eq(albums.ownerId, session.user.id)));
 
-        await redisCache.del(`user_albums_grid:${session.user.id}`);
+        await cacheInvalid.onAlbumChanged(session.user.id);
         revalidatePath("/albums");
         revalidatePath(`/albums/${albumId}`);
         return { success: true };
@@ -145,7 +145,7 @@ export async function uploadNewCoverAction(albumId: string, data: { filename: st
         await db.insert(albumMedia).values({ albumId, mediaId: newMedia.id });
         await db.update(albums).set({ coverMediaId: newMedia.id }).where(eq(albums.id, albumId));
 
-        await redisCache.del(`user_albums_grid:${session.user.id}`);
+        await cacheInvalid.onAlbumChanged(session.user.id);
         revalidatePath("/albums");
         revalidatePath(`/albums/${albumId}`);
         return { success: true };
