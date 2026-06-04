@@ -5,7 +5,8 @@ import { processMediaItem, processThumbnails, processAiIndexing } from '@/server
 import { env } from '@/lib/env'
 import { processMigrationJob } from "@/server/services/migration-processor";
 import { cleanExpiredTrash } from "@/server/actions/media-mutations";
-import path from "path"
+import path from "path";
+import { processTakeout } from "@/server/services/takeout-processor";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -29,6 +30,12 @@ const aiWorker = new Worker(
         await processAiIndexing(job.data.mediaId);
     }, { connection, concurrency: 2 });
 
+const takeoutWorker = new Worker(
+    'takeout-generation',
+    async (job) => {
+        await processTakeout(job.data.userId);
+    }, { connection, concurrency: 1 });
+
 function logging(worker: Worker, name: string) {
     worker.on('completed', (job) => console.log(`[${name} job ${job.id}] completed`));
     worker.on('failed', (job, err) => console.error([`${name} job ${job?.id} Failed:`, err]));
@@ -37,6 +44,7 @@ function logging(worker: Worker, name: string) {
 logging(metadataWorker, "Metadata");
 logging(thumbnailWorker, "Thumbnail");
 logging(aiWorker, "AI index");
+logging(takeoutWorker, "Takeout");
 
 console.log('lumi workers are active')
 const migrator = new Worker('storage-migration', async (job) => {
