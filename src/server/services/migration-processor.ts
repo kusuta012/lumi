@@ -7,6 +7,7 @@ import path from "path";
 import os from "os";
 import fs from "fs/promises";
 
+
 export async function processMigrationJob(sourceId: string, targetId: string) {
     try {
         console.log(`starting migragrion from ${sourceId} to ${targetId}`);
@@ -35,7 +36,52 @@ export async function processMigrationJob(sourceId: string, targetId: string) {
 
         let successCount = 0;
         for (const item of itemsToMigrate) {
+            try {
+                const keysToMove: string[] = [item.objectKey];
+                if (item.thumbnails) {
+                    Object.values(items.thumbnail as Record<string, string>).forEach(k => keysToMove.push(k));
+                }
+                if (item.hoverSpriteKey) {
+                    keysToMove.push(item.hoverSpriteKey);
+                }
+                if (item.hlsPlaylistKey) {
+                    const hlsDir = path.dirname(item.hlsPlaylistKey) + "/";
+                    const stream  = sourceDrive.client.listObjects(sourceDrive.bucket, hlsDir, false);
+                    for await (const chunk of stream) {
+                        if (chunk.name) keysToMove.push(chunk.name);
+                    }
+                }
 
+                for (const key of keysToMove) {
+                    const tempPath = path.join(os.tmpdir(), `mig-${crypto.randomUUID()}`);
+                    try {
+                        const sStat = await sourceDrive.client.statObject(sourceDrive.bucket, key);
+                        await sourceDrive.client.fGetObject(sourceDrive.bucket, key, tempPath);
+                        await targetDrive.client.fPutObject(targetDrive.bucket, key, tempPath, {});
+                        const tStat = await targetDrive.client.statObject(targetDrive.bucket, key);
+
+                        if (tStat.size === 0 || tStat.size !== sStat.size) {
+                            throw new Error(`Size mismatch for ${key} source ${sStat.size}, target: ${tStat.size}`);
+                        }
+                    } finally {
+                        try { await fs.unlink(tempPath); } catch (e) {}
+                    }
+                }
+
+                await db.update(media)
+                    .set({ storageBackendId: targetId === 'env' ? null : targetId })
+                    .where(eq(media.id, item.id));
+
+                for (const key of keysToMove) {
+                    await sourceDrive.client.removeObject(sourceDrive.bucket, key);
+                }
+
+                successCount++;
+                console.log(`Migrated ${item.filename} and all associated assests`);
+            } catch (err) {
+                console.error(`failed to move item ${item.id}`, err);
+            }
+        
             const tempOriginal = path.join(os.tmpdir(), `mig-orig-${item.id}`);
             try {
                 const sStat = await sourceDrive.client.statObject(sourceDrive.bucket, item.objectKey);
@@ -75,9 +121,7 @@ export async function processMigrationJob(sourceId: string, targetId: string) {
                 console.log(`migrated ${item.filename}`);
             } catch (err) {
                 console.error(`failed to move item ${item.id}`, err);
-            } finally {
-                try { await fs.unlink(tempOriginal); } catch (e) {}
-            }
+            } 
         }
         console.log(`migration finished ${successCount}/${itemsToMigrate.length} items`);
         await db.update(platformConfig).set({ value: false }).where(eq(platformConfig.key, 'maintenance_mode'));
