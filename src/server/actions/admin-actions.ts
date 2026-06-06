@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { redisCache } from "@/lib/cache";
 import { logAuditEvent } from "@/lib/audit";
+import { systemQueue } from "@/lib/queue";
 
 async function ensureSuperAdmin() {
     const session = await auth();
@@ -105,5 +106,19 @@ export async function deleteUserAction(userId: string) {
     } catch (e) {
         console.error("failed to delete user", e);
         return { success: false, error: "db update failed"};
+    }
+}
+
+export async function triggerSystemBackup() {
+    const session = await ensureSuperAdmin();
+
+    try {
+        await systemQueue.add("database-backup", { userId: session?.user.id });
+        await logAuditEvent("system_backup_requested", "system", session?.user.id);
+
+        return { success: true, message: "System backup queued successfully" };
+    } catch (err) {
+        console.error("Failed to queue system backup", err);
+        return { sucess: false, error: "Failed to queue backup job" };
     }
 }

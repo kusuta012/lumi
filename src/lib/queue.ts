@@ -24,6 +24,8 @@ export const aiQueue = new Queue('ai-indexing', {
 
 export const takeoutQueue = new Queue('takeout-generation', { connection, defaultJobOptions });
 
+export const systemQueue = new Queue('system-tasks', { connection, defaultJobOptions });
+
 export const migrationQueue = new Queue('storage-migration', {
     connection,
     defaultJobOptions: { attempts: 1 }

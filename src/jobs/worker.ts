@@ -7,6 +7,8 @@ import { processMigrationJob } from "@/server/services/migration-processor";
 import { cleanExpiredTrash } from "@/server/actions/media-mutations";
 import path from "path";
 import { processTakeout } from "@/server/services/takeout-processor";
+import { systemQueue } from "@/lib/queue";
+import { SystemBackupJob } from "@/server/services/system-backup";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -36,6 +38,14 @@ const takeoutWorker = new Worker(
         await processTakeout(job.data.userId);
     }, { connection, concurrency: 1 });
 
+const systemWorker = new Worker(
+    'system-tasks',
+    async (job) => {
+        if (job.name === "database-backup") {
+            await SystemBackupJob(job.data?.userId);
+        }
+    }, { connection, concurrency: 1 });
+
 function logging(worker: Worker, name: string) {
     worker.on('completed', (job) => console.log(`[${name} job ${job.id}] completed`));
     worker.on('failed', (job, err) => console.error([`${name} job ${job?.id} Failed:`, err]));
@@ -45,6 +55,7 @@ logging(metadataWorker, "Metadata");
 logging(thumbnailWorker, "Thumbnail");
 logging(aiWorker, "AI index");
 logging(takeoutWorker, "Takeout");
+logging(systemWorker, "System");
 
 console.log('lumi workers are active')
 const migrator = new Worker('storage-migration', async (job) => {
@@ -52,6 +63,10 @@ const migrator = new Worker('storage-migration', async (job) => {
 }, { connection });
 
 console.log('lumi migration worker is active');
+
+systemQueue.add("database-backup", { userId: "system_cron" }, {
+    repeat: { pattern: "0 3 * * *" }
+}); 
 
 cleanExpiredTrash();
 setInterval(() => {
