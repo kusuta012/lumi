@@ -1,4 +1,4 @@
-import archiver from "archiver";
+import yazl, { ZipFile } from "yazl";
 import { PassThrough } from "stream";
 import { db } from "@/db";
 import { media, storageBackends, auditLogs } from "@/db/schema";
@@ -18,10 +18,10 @@ export async function processTakeout(userId: string) {
 
         const defaultBackend = await db.query.storageBackends.findFirst({ where: eq(storageBackends.isDefault, true) });
         const dest = getStorageClient(defaultBackend?.config);
-        const archive = archiver('zip', { zlib: { level: 5 } });
+        const archive = new yazl.ZipFile();
         const streamBridge = new PassThrough();
 
-        archive.pipe(streamBridge);
+        archive.outputStream.pipe(streamBridge);
         const zipFilename = `backups/${userId}/takeout-${Date.now()}.zip`;
         const uploadPromise = dest.client.putObject(dest.bucket, zipFilename, streamBridge as any);
 
@@ -29,17 +29,17 @@ export async function processTakeout(userId: string) {
             const src = getStorageClient(item.storageBackend?.config);
             try {
                 const fileStream = await src.client.getObject(src.bucket, item.objectKey);
-                archive.append(fileStream as any, { name: `photos/${item.filename}` });
+                archive.addReadStream(fileStream as any, `photos/${item.filename}`);
             } catch (err) {
                 console.error(`takeout failed to fetch ${item.filename}`);
             }
         }
 
         const metadataDump = JSON.stringify(userMedia, null, 2);
-        archive.append(metadataDump, { name: "metadata.json" });
-        await archive.finalize();
+        archive.addBuffer(Buffer.from(metadataDump), "metadata.json");
+        archive.end();
         await uploadPromise;
-        const downloadUrl = await dest.client.presignedGetObject(dest.bucket, zipFilename, 7 * 24 * 60 * 60);
+        const downloadUrl = `/api/takeout?file=${encodeURIComponent(zipFilename)}`;
         await db.insert(auditLogs).values({
             actorId: userId,
             action: "takeout_generated",
