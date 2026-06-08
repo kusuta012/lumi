@@ -1,12 +1,12 @@
 "use server";
 
 import { db } from "@/db";
-import { media, users} from "@/db/schema";
+import { media, users, albums, albumMedia} from "@/db/schema";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { addMediaToPipe } from "@/lib/queue"
 import { eq, sql } from "drizzle-orm"
-import { redisCache } from "@/lib/cache";
+import { redisCache, cacheInvalid } from "@/lib/cache";
  
 export async function recordMediaUpload(data: {
     filename: string;
@@ -14,6 +14,7 @@ export async function recordMediaUpload(data: {
     size: number;
     objectKey: string;
     storageBackendId: string | null;
+    albumName?: string;
 }) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
@@ -36,11 +37,32 @@ export async function recordMediaUpload(data: {
                     storageUsed: sql`${users.storageUsed} + ${sizeInMB}`
                 })
                 .where(eq(users.id, session.user.id));
+            if (data.albumName) {
+                let targetAlbumId: string;
+                const existingAlbum = await tx.query.albums.findFirst({
+                    where: eq(albums.name, data.albumName)
+                });
+                if (existingAlbum) {
+                    targetAlbumId = existingAlbum.id;
+                } else {
+                    const [newAlbum] = await tx.insert(albums).values({
+                        ownerId: session.user.id,
+                        name: data.albumName,
+                        coverMediaId: newMedia.id
+                    }).returning();
+                    targetAlbumId = newAlbum.id;
+                }
+                await tx.insert(albumMedia).values({
+                    albumId: targetAlbumId,
+                    mediaId: newMedia.id
+                }).onConflictDoNothing();
+            }
             
             await addMediaToPipe(newMedia.id)
         });
 
-        await redisCache.del(`user_photos_timeline:${session.user.id}`);
+        await cacheInvalid.onMediaChanged(session.user.id);
+        if (data.albumName) await cacheInvalid.onAlbumChanged(session.user.id);
 
         revalidatePath("/photos");
         revalidatePath("/albums", "layout")
