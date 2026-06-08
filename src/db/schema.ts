@@ -105,6 +105,9 @@ export const media = pgTable('media', {
     lensModel: text('lens_model'), // idk if this should be here
     gpsLat: real('gps_lat'),
     gpsLng: real('gps_lng'),
+    locationCity: text('location_city'),
+    locationState: text('location_state'),
+    locationCountry: text('location_country'),
     caption: text('caption'),
     isArchived: boolean('is_archived').default(false),
     isFavorited: boolean('is_favorited').default(false),

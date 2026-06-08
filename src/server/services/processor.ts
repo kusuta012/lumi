@@ -16,6 +16,7 @@ import { redisCache } from "@/lib/cache";
 import crypto from "crypto";
 import { env } from "@/lib/env"
 import { thumbnailQueue, aiQueue } from "@/lib/queue";
+import { geoChief } from "./geo-chief";
 
 sharp.concurrency(2);
 sharp.cache({ items: 50, memory: 100 });
@@ -134,6 +135,29 @@ export async function processMediaItem(mediaId: string) {
     let cameraModel: string | null = null;
     let gpsLat: number | null = null;
     let gpsLng: number | null = null;
+    let locationCity: string | null = null;
+    let locationState: string | null = null;
+    let locationCountry: string | null = null;
+
+    if (gpsLat !== null && gpsLng !== null) {
+      try {
+        const location = await geoChief.resolve(gpsLat, gpsLng);
+        if (location) {
+          locationCity = location.name;
+          locationState = location.adminName;
+          locationCountry = location.countryCode;
+        }
+      } catch (err) {
+          console.error(`failed to reverse geocode ${item.filename}`, err);
+      }
+    }
+
+    await db.update(media).set({
+        width, height, duration,
+        dateTaken: dateTaken || item.createdAt,
+        cameraModel, gpsLat, gpsLng, hash: fileHash,
+        locationCity, locationState, locationCountry
+    }).where(eq(media.id, item.id));
 
     if (isVideo) {
       const stats = await fs.stat(localInput);
