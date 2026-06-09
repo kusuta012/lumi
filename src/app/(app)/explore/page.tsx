@@ -1,10 +1,11 @@
 import { auth } from "@/server/auth";
 import { redirect } from "next/navigation";
-import { Users, Sparkles, ImageOff } from "lucide-react";
+import { ImageOff, MapPin } from "lucide-react";
 import ExploreSection from "@/components/explore/ExploreSection";
 import PeopleRow from "@/components/explore/PeopleRow";
 import RcntHighlights from "@/components/explore/RcntHighlights";
-import { getTopPeople, getRcntHighlights } from "@/server/queries/explore";
+import PlacesGrid from "@/components/explore/PlacesGrid";
+import { getTopPeople, getRcntHighlights, getTopPlaces } from "@/server/queries/explore";
 
 export default async function ExplorePg() {
     const session = await auth();
@@ -14,11 +15,12 @@ export default async function ExplorePg() {
 
     const userId = session.user.id;
 
-    const [TopPerson,rcntHighlights] = await Promise.all([
+    const [TopPerson,rcntHighlights, topPlaces] = await Promise.all([
         getTopPeople(userId),
-        getRcntHighlights(userId)
+        getRcntHighlights(userId),
+        getTopPlaces(userId)
     ]);
-    const hasData = TopPerson.length > 0 || rcntHighlights.length > 0;
+    const hasData = TopPerson.length > 0 || rcntHighlights.length > 0 || topPlaces.length > 0;
     return (
         <div className="p-8 pb-24 space-y-12">
             <header className="pb-6 border-b border-border">
@@ -34,6 +36,12 @@ export default async function ExplorePg() {
                     {TopPerson.length > 0 && (
                         <ExploreSection title="People" viewAllHref="/people">
                         <PeopleRow people={TopPerson} />
+                        </ExploreSection>
+                    )}
+
+                    {topPlaces.length > 0 && (
+                        <ExploreSection title="Places">
+                            <PlacesGrid places={topPlaces} />
                         </ExploreSection>
                     )}
 

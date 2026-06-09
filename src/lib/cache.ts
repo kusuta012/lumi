@@ -49,7 +49,8 @@ export const cacheInvalid = {
         const keys = [
             `user_photos_timeline:${userId}`,
             `user_explore_highlight:${userId}`,
-            `user_explore_memories:${userId}`
+            `user_explore_memories:${userId}`,
+            `user_explore_places:${userId}`
         ];
         if (mediaId) keys.push(`media_meta:${mediaId}`);
         if (hasGps) keys.push(`user_locations:${userId}`);

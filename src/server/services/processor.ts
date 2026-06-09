@@ -12,7 +12,7 @@ import fs from "fs/promises";
 import { createReadStream, createWriteStream} from "fs";
 import path from "path";
 import os from "os";
-import { redisCache } from "@/lib/cache";
+import { redisCache, cacheInvalid } from "@/lib/cache";
 import crypto from "crypto";
 import { env } from "@/lib/env"
 import { thumbnailQueue, aiQueue } from "@/lib/queue";
@@ -123,7 +123,7 @@ export async function processMediaItem(mediaId: string) {
           .set({ storageUsed: sql`GREATEST(0, ${users.storageUsed} - ${sizeInMB})` })
           .where(eq(users.id, item.ownerId));
       await client.removeObject(bucket, item.objectKey);
-      await redisCache.del(`user_photos_timeline:${item.ownerId}`);
+      await cacheInvalid.onMediaChanged(item.ownerId, item.id, existingMedia.gpsLat !== null);
       await fs.rm(pipeDir, { recursive: true, force: true });
       return;
     }
@@ -138,26 +138,6 @@ export async function processMediaItem(mediaId: string) {
     let locationCity: string | null = null;
     let locationState: string | null = null;
     let locationCountry: string | null = null;
-
-    if (gpsLat !== null && gpsLng !== null) {
-      try {
-        const location = await geoChief.resolve(gpsLat, gpsLng);
-        if (location) {
-          locationCity = location.name;
-          locationState = location.adminName;
-          locationCountry = location.countryCode;
-        }
-      } catch (err) {
-          console.error(`failed to reverse geocode ${item.filename}`, err);
-      }
-    }
-
-    await db.update(media).set({
-        width, height, duration,
-        dateTaken: dateTaken || item.createdAt,
-        cameraModel, gpsLat, gpsLng, hash: fileHash,
-        locationCity, locationState, locationCountry
-    }).where(eq(media.id, item.id));
 
     if (isVideo) {
       const stats = await fs.stat(localInput);
@@ -231,6 +211,19 @@ export async function processMediaItem(mediaId: string) {
             }
           }
 
+          if (gpsLat !== null && gpsLng !== null) {
+            try {
+              const location = await geoChief.resolve(gpsLat, gpsLng);
+              if (location) {
+                locationCity = location.name;
+                locationState = location.adminName;
+                locationCountry = location.countryCode;
+              }
+            } catch (err) {
+                console.error(`failed to reverse geocode ${item.filename}`, err);
+            }
+          }
+
           await db
             .update(media)
             .set({
@@ -241,12 +234,14 @@ export async function processMediaItem(mediaId: string) {
               cameraModel,
               gpsLat,
               gpsLng,
-              hash: fileHash
+              hash: fileHash,
+              locationCity,
+              locationCountry,
+              locationState
             })
             .where(eq(media.id, item.id));
 
-          await redisCache.del(`user_photos_timeline:${item.ownerId}`);
-          await redisCache.del(`media_meta${mediaId}`);
+          await cacheInvalid.onMediaChanged(item.ownerId, mediaId, gpsLat !== null && gpsLng !== null);
           await thumbnailQueue.add("generate-thumbs", { mediaId });
           
     } catch (err) {
@@ -389,7 +384,7 @@ export async function processMediaItem(mediaId: string) {
       hoverSpriteKey,
       hlsPlaylistKey
     }).where(eq(media.id, item.id));
-    await redisCache.del(`media_meta:${item.id}`);
+    await cacheInvalid.onMediaChanged(item.ownerId, item.id, item.gpsLat !== null);
     
     await aiQueue.add("ai-index", {mediaId});
   } catch (err) { console.error(`thumbnail gen error for ${item.id}`, err);
@@ -521,11 +516,9 @@ export async function processAiIndexing(mediaId: string) {
       }
 
       console.log(`processed ${isVideo ? 'video' : 'image'}: ${item.filename}`);
-      await redisCache.del(`user_photos_timeline:${item.ownerId}`);
-      await redisCache.del(`user_albums_grid:${item.ownerId}`);
-      if (item.gpsLat !== null && item.gpsLng !== null) {
-        await redisCache.del(`user_locations:${item.ownerId}`);
-      }
+      await cacheInvalid.onMediaChanged(item.ownerId, item.id, item.gpsLat !== null && item.gpsLng !== null);
+      await cacheInvalid.onAlbumChanged(item.ownerId);
+      await cacheInvalid.onAimetaChanged(item.ownerId);
     } catch (err) {
       console.error(`AI processing erorr for ${item.id}`, err);
       throw err;

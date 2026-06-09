@@ -73,7 +73,10 @@ export default async function SearchPage({
                     eq(media.isLocked, false),
                     or(
                         ilike(media.filename, `%${query}%`),
-                        ilike(media.cameraModel, `%${query}%`)
+                        ilike(media.cameraModel, `%${query}%`),
+                        ilike(media.locationCity, `%${query}%`),
+                        ilike(media.locationState, `%${query}%`),
+                        ilike(media.locationCountry, `%${query}%`),
                     )
                 ),
                 orderBy: [desc(media.dateTaken), desc(media.createdAt)],

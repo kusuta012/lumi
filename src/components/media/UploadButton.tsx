@@ -158,7 +158,7 @@ export default function UploadButton() {
         <label className="flex items-center gap-2 px-4 py-1.5 bg-transparent hover:bg-surface-hover border-border text-foreground rounded-full cursor-pointer transition-all text-sm font-medium disabled:opacity-50">
             <UploadCloud className="w-4 h-4"></UploadCloud>
             {loading ? progress : "Upload"}
-            <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={onFileSelect} disabled={loading} {...({ webkitdirectory: "true" } as any)}/>
+            <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={onFileSelect} disabled={loading} />
         </label>
     );
 }

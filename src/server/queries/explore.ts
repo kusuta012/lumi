@@ -22,6 +22,13 @@ export interface HighlightItem {
     blurScore: number | null;
 }
 
+export interface PlaceHighlight {
+    city: string;
+    country: string;
+    mediaCount: number;
+    coverMediaId: string;
+}
+
 export async function getTopPeople(userId: string): Promise<TopPerson[]> {
     const cacheKey = `user_explore_people:${userId}`;
     const cachedData = await redisCache.get(cacheKey);
@@ -86,4 +93,31 @@ export async function getRcntHighlights(userId: string): Promise<HighlightItem[]
     }));
     await redisCache.set(cacheKey, serializable, 3600);
     return results as unknown as HighlightItem[];
+}
+
+export async function getTopPlaces(userId: string): Promise<PlaceHighlight[]> {
+    const cacheKey = `user_explore_places:${userId}`;
+    const cachedData = await redisCache.get(cacheKey);
+
+    if (cachedData) return cachedData as PlaceHighlight[];
+    const result = await db.select({
+        city: media.locationCity,
+        country: media.locationCountry,
+        mediaCount: sql<number>`count(${media.id})::int`,
+        coverMediaId: sql<string>`(array_agg(${media.id} ORDER BY ${media.createdAt} DESC))[1]`
+    })
+    .from(media)
+    .where(and(
+        eq(media.ownerId, userId),
+        eq(media.isDeleted, false),
+        eq(media.isLocked, false),
+        isNotNull(media.locationCity)
+    ))
+    .groupBy(media.locationCity, media.locationCountry)
+    .orderBy(desc(sql`count(${media.id})`))
+    .limit(8);
+
+    const places = (result as any) as PlaceHighlight[];
+    await redisCache.set(cacheKey, places, 3600);
+    return places;
 }

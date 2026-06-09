@@ -110,6 +110,8 @@ export class ReverseGeocoder {
     private tree: SpatialTree;
     private isReady: boolean = false;
     private intializationPromise: Promise<void> | null = null;
+    
+    private cache = new Map<string, City>();
 
     private constructor() {
         this.provider = new GeonamesProvider();
@@ -123,24 +125,63 @@ export class ReverseGeocoder {
         return ReverseGeocoder.instance;
     }
 
-    private async _intialize() {
+    private async _initialize() {
         await this.provider.ensureDataExists();
         const cities = await this.provider.loadMem();
         this.tree.build(cities);
         this.isReady = true;
     }
 
-    public async intialize(): Promise<void> {
+    public async initialize(): Promise<void> {
         if (this.isReady) return;
         if (!this.intializationPromise) {
-            this.intializationPromise = this._intialize();
+            this.intializationPromise = this._initialize();
         }
         return this.intializationPromise;
     }
 
     public async resolve(lat: number, lng: number): Promise<City | null> {
-        await this.intialize();
-        return this.tree.getNearest(lat, lng);
+        const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+        if (this.cache.has(key)) {
+            return this.cache.get(key) || null;
+        }
+
+        try {
+            const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
+            const resp = await fetch(url, {
+                signal: AbortSignal.timeout(2000)
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                const name = data.locality || data.city || data.principalSubdivision;
+
+                if (name) {
+                    const cityInfo: City = {
+                        name: name,
+                        adminName: data.principalSubdivision || "",
+                        countryCode: data.countryCode ? data.countryCode.toUpperCase() : "",
+                        lat,
+                        lng
+                    };
+                    this.cache.set(key, cityInfo);
+                    return cityInfo;
+                }
+            }
+        } catch (err) {
+            console.error("bigdatacloudd API error", err);
+        }
+        try {
+            await this.initialize();
+            const fallbackCity = this.tree.getNearest(lat, lng);
+            if (fallbackCity) {
+                this.cache.set(key, fallbackCity);
+                return fallbackCity;
+            }
+        } catch (err) {
+            console.error("offline geocoding error", err);
+        }
+        return null;
     }
 }
 
