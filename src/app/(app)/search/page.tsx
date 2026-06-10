@@ -4,6 +4,7 @@ import { eq, desc, and , or, ilike, sql, isNotNull} from "drizzle-orm";
 import { auth } from "@/server/auth";
 import TimelineGallery from "@/components/media/TimelineGallery";
 import { env } from "@/lib/env";
+import { HybridSearchEngine } from "@/server/services/search-engine";
 
 export default async function SearchPage({
     searchParams
@@ -22,32 +23,12 @@ export default async function SearchPage({
     if (query.trim()) {
         if (mode === "context") {
             try {
-                const mlRes = await fetch(`${env.ML_API_URl}/encode/text`, {
-                    method: "POST",
-                    headers: { "Accept": "application/json",
-                             "Content-Type": "application/json" },
-                    body: JSON.stringify({ text: query })
-                });
-
-                if (mlRes.ok) {
-                    const { embedding } = await mlRes.json();
-                    const embeddingStr = `[${embedding.join(`,`)}]`;
-
-                    results = await db.query.media.findMany({
-                        where: and(
-                            eq(media.ownerId, session.user.id),
-                            eq(media.isDeleted, false),
-                            eq(media.isLocked, false),
-                            isNotNull(media.clipEmbedding),
-                            sql`${media.clipEmbedding} <=> ${embeddingStr}::vector < 0.77`
-                        ),
-                        orderBy: sql`${media.clipEmbedding} <=> ${embeddingStr}::vector ASC`,
-                        limit: 50
-                    });
-                console.log(`Context search completed. Found ${results.length} matches.`);
-                }
+                const searchOutput = await HybridSearchEngine.execute(session.user.id, query);
+                results = searchOutput.results;
+                // parsedInfo = searchOutput.parsed;
+                console.log(`hybrid search completed. Found ${results.length} matches.`);
             } catch (err) {
-                console.error("Context Search failed to reach ML API", err);
+                console.error("hybrid Search failed to reach ML API", err);
             }
         }
         else if (mode === "ocr") {
