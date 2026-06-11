@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { addMediaToPipe } from "@/lib/queue";
 import { eq, sql, and } from "drizzle-orm";
+import { broadcastAlbumUpdate } from "@/lib/pubsub";
 
 export async function createShareLink(data: {
     targetType: 'media' | 'album';
@@ -122,6 +123,7 @@ export async function publicUploadToSharedAlbum(token: string, data: {
                 albumId: link.targetId,
                 mediaId: newMedia.id,
             });
+            await broadcastAlbumUpdate(link.targetId);
 
             await tx.update(users)
                 .set({ storageUsed: sql`${users.storageUsed} + ${sizeInMB}` })

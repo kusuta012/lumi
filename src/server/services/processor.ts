@@ -17,6 +17,8 @@ import crypto from "crypto";
 import { env } from "@/lib/env"
 import { thumbnailQueue, aiQueue } from "@/lib/queue";
 import { geoChief } from "./geo-chief";
+import { broadcastAlbumUpdate } from "@/lib/pubsub";
+import { albumMedia } from "@/db/schema";
 
 sharp.concurrency(2);
 sharp.cache({ items: 50, memory: 100 });
@@ -513,6 +515,13 @@ export async function processAiIndexing(mediaId: string) {
                 WHERE id = ${personId} AND cover_face_id is NULL    
             `);
         }
+      }
+      const linkedAlbums = await db.select({ albumId: albumMedia.albumId })
+          .from(albumMedia)
+          .where(eq(albumMedia.mediaId, item.id));
+      
+      for (const link of linkedAlbums) {
+          await broadcastAlbumUpdate(link.albumId);
       }
 
       console.log(`processed ${isVideo ? 'video' : 'image'}: ${item.filename}`);

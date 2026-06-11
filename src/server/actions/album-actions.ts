@@ -8,6 +8,7 @@ import { eq, and } from "drizzle-orm";
 import { addMediaToPipe } from "@/lib/queue";
 import { cacheInvalid } from "@/lib/cache";
 import { logAuditEvent } from "@/lib/audit";
+import { broadcastAlbumUpdate } from "@/lib/pubsub";
 
 
 export async function addToAlbumAction(mediaIds: string[], albumName: string) {
@@ -27,6 +28,7 @@ export async function addToAlbumAction(mediaIds: string[], albumName: string) {
         }));
 
         await db.insert(albumMedia).values(entries);
+        await broadcastAlbumUpdate(newAlbum.id);
 
         await cacheInvalid.onAlbumChanged(session.user.id);
         revalidatePath("/albums");
@@ -67,7 +69,7 @@ export async function addMediaToExistingAlbumAction(albumId: string, mediaIds: s
 
         const entries = mediaIds.map((id) => ({ albumId, mediaId: id }));
         await db.insert(albumMedia).values(entries).onConflictDoNothing();
-
+        await broadcastAlbumUpdate(albumId);
         if (!album.coverMediaId && mediaIds.length > 0) {
             await db.update(albums).set({ coverMediaId: mediaIds[0] }).where(eq(albums.id, albumId));
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useTransition, useEffect, useCallback, useRef, useMemo} from "react";
 import Lightbox from "./Lightbox";
 import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw } from "lucide-react";
 import AddToAlbumModal from "./AddToAlbumModal";
@@ -9,7 +9,7 @@ import ShareModal from "./ShareModal";
 import { useNotification } from "../providers/NotificationProvider";
 import { useInView } from "react-intersection-observer";
 import { useVirtualizer } from "@tanstack/react-virtual";
-// import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import TimelineScrub, { ScrubberPoint } from "./TimelineScrub";
 
 interface MediaItem {
@@ -65,6 +65,24 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     const { ref: loadMoreRef, inView } = useInView({
         rootMargin: '600px',
     });
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!albumId) return;
+
+        const eventSource = new EventSource(`/api/albums/${albumId}/events`);
+
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "UPDATE") {
+                router.refresh();
+            }
+        };
+
+        return () => {
+            eventSource.close();
+        };
+    }, [albumId, router]);
     
 
     const loadMorePhotos = useCallback(async () => {
@@ -116,24 +134,6 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         setCursor(initialMedia.length >= 50 && !isSearchPage ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null);
         setHasMore(initialMedia.length >= 50 && !isSearchPage);
     }, [initialMedia, isSearchPage]);
-
-    // const searchParams = useSearchParams();
-    //     const router = useRouter();
-    //     const hasAutoOpened = useRef(false);
-
-    // useEffect(() => {
-    //     if (hasAutoOpened.current) return;
-    //     const openId = searchParams?.get("open");
-    //     if (openId && mediaItems.length > 0) {
-    //         const index = mediaItems.findIndex(m => m.id === openId);
-    //         if (index !== -1) {
-    //             setSelectedIndex(index);
-    //             hasAutoOpened.current = true;
-    //             router.replace(window.location.pathname, { scroll: false });
-    //         }
-    //     }
-    // }, [searchParams, mediaItems, router]);  
-    //  ^ I just scrapped this code and found a better way to do it
 
     const groupedMedia = mediaItems.reduce<Record<string, MediaItem[]>>((acc, item) => {
         const d = item.dateTaken ? new Date(item.dateTaken) : new Date(item.createdAt);

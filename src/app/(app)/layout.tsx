@@ -21,7 +21,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     })
 
     return (
-        <NotificationProvider>
             <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
                 <Sidebar userRole={session.user.roleName} storageUsed={userStats?.storageUsed || 0} storageQuota={userStats?.storageQuota || 5120} />
                 <div className="flex-1 flex flex-col min-w-0">
@@ -31,6 +30,5 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     </main>
                 </div>
             </div>
-        </NotificationProvider>
     );
 }
