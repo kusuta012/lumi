@@ -9,6 +9,7 @@ import { addMediaToPipe } from "@/lib/queue";
 import { cacheInvalid } from "@/lib/cache";
 import { logAuditEvent } from "@/lib/audit";
 import { broadcastAlbumUpdate } from "@/lib/pubsub";
+import { getAlbumRole, hasPermission } from "../services/rbac";
 
 
 export async function addToAlbumAction(mediaIds: string[], albumName: string) {
@@ -64,6 +65,10 @@ export async function addMediaToExistingAlbumAction(albumId: string, mediaIds: s
     if (!session?.user?.id) throw new Error("Unauthorized");
 
     try {
+        const role = await getAlbumRole(albumId, session.user.id);
+        if (!hasPermission(role, 'contribute')) {
+            return { success: false, error: "You do not have permission to add photos to this album" };
+        }
         const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
         if (!album || album.ownerId !== session.user.id) throw new Error("Not found");
 
@@ -87,6 +92,10 @@ export async function deleteAlbumAction(albumId: string) {
     if (!session?.user?.id) throw new Error("Unauthorized");
 
     try {
+        const role = await getAlbumRole(albumId, session.user.id);
+        if (!hasPermission(role, 'delete')) {
+            return { success: false, error: "Only the album owner can delete the entire album" }
+        }
         const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
         await db.transaction(async (tx) => {
             await tx.delete(albumMedia).where(eq(albumMedia.albumId, albumId));
@@ -112,13 +121,18 @@ export async function updateAlbumAction(albumId: string, data: { name?: string, 
     if (!session?.user?.id) throw new Error("Unauthorized");
 
     try {
+        const role = await getAlbumRole(albumId, session.user.id);
+        if (!hasPermission(role, 'manage')) {
+            return { success: false, error: "You do not have permission to edit this album's details" };
+        }
+
         await db.update(albums)
             .set({
                 ...(data.name && { name: data.name }),
                 ...(data.description !== undefined && { description: data.description }),
                 ...(data.coverMediaId && { coverMediaId: data.coverMediaId })
             })
-            .where(and(eq(albums.id, albumId), eq(albums.ownerId, session.user.id)));
+            .where(eq(albums.id, albumId));
 
         await cacheInvalid.onAlbumChanged(session.user.id);
         revalidatePath("/albums");

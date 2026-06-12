@@ -6,7 +6,7 @@ import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { addMediaToPipe } from "@/lib/queue";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, ilike, not, or } from "drizzle-orm";
 import { broadcastAlbumUpdate } from "@/lib/pubsub";
 
 export async function createShareLink(data: {
@@ -139,18 +139,28 @@ export async function publicUploadToSharedAlbum(token: string, data: {
     }
 }
 
-export async function updateAlbumContributors(albumId: string, userIds: string[]) {
+export async function updateAlbumContributors(albumId: string,
+    contributors: { userId: string; role: 'viewer' | 'contributor' | 'co_owner' }[]
+) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
-    await db.transaction(async (tx) => {
-        await tx.delete(albumContributors).where(eq(albumContributors.albumId, albumId));
-        if (userIds.length > 0) {
-            const entries = userIds.map(uid => ({ albumId, userId: uid }));
-            await tx.insert(albumContributors).values(entries);
-        }
-    });
-    return { success: true };
+    const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
+    if (!album || album.ownerId !== session.user.id) throw new Error("Forbidden");
+
+    try {
+        await db.transaction(async (tx) => {
+            await tx.delete(albumContributors).where(eq(albumContributors.albumId, albumId));
+            if (contributors.length > 0) {
+                const entries = contributors.map(c => ({ albumId, userId: c.userId, role: c.role }));
+                await tx.insert(albumContributors).values(entries);
+            }
+        });
+        return { success: true };
+    } catch (err) {
+        console.error("Failed to update contributors", err);
+        return { success: false, error: "Failed to update contributors" };
+    }
 }
 
 export async function deleteShareLink(linkId: string) {
@@ -167,3 +177,31 @@ export async function deleteShareLink(linkId: string) {
         return { success: false, error: "failed to delete share lnik" };
     }
 }
+
+export async function searchUsersAction(query: string) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    if (!query || query.length < 2) return { success: true, users: [] };
+
+    try {
+        const foundUsers = await db.select({
+            id: users.id,
+            username: users.username,
+            email: users.email
+        })
+        .from(users)
+        .where(and(
+            not(eq(users.id, session.user.id)),
+            or(
+                ilike(users.username, `%${query}%`),
+                ilike(users.email, `%${query}%`)
+            )
+        ))
+        .limit(5);
+        return { success: true, users: foundUsers };
+    } catch (err) {
+        console.error("Search users failed", err);
+        return { success: false, error: "Failed to search users" };
+    }
+}
+

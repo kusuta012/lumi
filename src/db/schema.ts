@@ -147,6 +147,7 @@ export const albumMedia = pgTable('album_media', {
 export const albumContributors = pgTable('album_contributors', {
     albumId: uuid('album_id').references(() => albums.id, { onDelete: 'cascade' }).notNull(),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    role: text('role').default('viewer').notNull(),
     grantedAt: timestamp('granted_at').defaultNow().notNull(),
 
 }, (t) => [primaryKey({ columns: [t.albumId, t.userId] })]);
