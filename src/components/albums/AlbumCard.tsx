@@ -8,9 +8,12 @@ import EditAlbumModal from "./EditAlbumModal";
 import { useRouter } from "next/navigation";
 import ShareModal from "../media/ShareModal";
 import { useNotification } from "../providers/NotificationProvider";
+import { useSession } from "next-auth/react";
 
 export default function AlbumCard({ album }: { album: any }) {
     const router = useRouter();
+    const { data: session } = useSession();
+    const isOwner = session?.user?.id === album.ownerId;
     const [menuOpen, setMenuOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -87,9 +90,11 @@ export default function AlbumCard({ album }: { album: any }) {
                             <Download size={16} /> Download
                         </button>
                         <div className="h-px bg-surface-hover my-1 w-full" />
-                            <button onClick={handleDelete} disabled={isPending} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-colors">
+                            {isOwner && (
+                                <button onClick={handleDelete} disabled={isPending} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-colors">
                                 <Trash2 size={16} /> Delete
-                            </button>
+                                </button>
+                            )}
                     </div>
                 )}
             </div>

@@ -5,6 +5,7 @@ import { auth } from "@/server/auth";
 import TimelineGallery from "@/components/media/TimelineGallery";
 import { notFound } from "next/navigation";
 import AlbumHeadersAction from "@/components/albums/AlbumHeadersActions";
+import { getAlbumRole, hasPermission } from "@/server/services/rbac";
 
 export default async function AlbumDetailPage({ params }: { params: Promise<{ id: string}> }) {
     const session = await auth();
@@ -18,13 +19,14 @@ export default async function AlbumDetailPage({ params }: { params: Promise<{ id
 
     if (!album) notFound();
 
-    const isOwner = album.ownerId === session.user.id;
-    if (!isOwner) {
-        const hasAccess = await db.query.albumContributors.findFirst({
-            where: and(eq(albumContributors.albumId, album.id), eq(albumContributors.userId, session.user.id))
-        });
-        if (!hasAccess) notFound();
+    const role = await getAlbumRole(id, session.user.id);
+
+    if (role === 'none') {
+        notFound();
     }
+
+    const isOwner = album.ownerId === session.user.id;
+    const canManage = hasPermission(role, 'manage');
 
     const shareLink = await db.query.shareLinks.findFirst({
         where: and(eq(shareLinks.targetId, id), eq(shareLinks.targetType, 'album'))
@@ -54,7 +56,7 @@ export default async function AlbumDetailPage({ params }: { params: Promise<{ id
                     <h1 className="text-3xl font-bold text-foreground">{album.name}</h1>
                     <p className="text-muted text-sm mt-1">{albumPhotos.length} items</p>
                 </div>
-                {isOwner && <AlbumHeadersAction album={album} />}
+                <AlbumHeadersAction album={album} role={role} />
             </div>
             
 

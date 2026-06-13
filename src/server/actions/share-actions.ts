@@ -8,6 +8,7 @@ import { nanoid } from "nanoid";
 import { addMediaToPipe } from "@/lib/queue";
 import { eq, sql, and, ilike, not, or } from "drizzle-orm";
 import { broadcastAlbumUpdate } from "@/lib/pubsub";
+import { getAlbumRole, hasPermission } from "../services/rbac";
 
 export async function createShareLink(data: {
     targetType: 'media' | 'album';
@@ -19,6 +20,14 @@ export async function createShareLink(data: {
 }) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
+
+    if (data.targetType === 'album') {
+        const role = await getAlbumRole(data.targetId, session.user.id);
+
+        if (data.allowUpload && !hasPermission(role, 'contribute')) {
+            return { success: false, error: "You do not have permission to create share link" }
+        }
+    }
 
     const token = nanoid(10);
     let expiresAt = null;
@@ -156,6 +165,7 @@ export async function updateAlbumContributors(albumId: string,
                 await tx.insert(albumContributors).values(entries);
             }
         });
+        await broadcastAlbumUpdate(albumId);
         return { success: true };
     } catch (err) {
         console.error("Failed to update contributors", err);
@@ -202,6 +212,26 @@ export async function searchUsersAction(query: string) {
     } catch (err) {
         console.error("Search users failed", err);
         return { success: false, error: "Failed to search users" };
+    }
+}
+
+export async function getAlbumContributors(albumId: string) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        const contributors = await db.select({
+            id: users.id,
+            username: users.username,
+            role: albumContributors.role
+        })
+        .from(albumContributors)
+        .innerJoin(users, eq(users.id, albumContributors.userId))
+        .where(eq(albumContributors.albumId, albumId));
+
+        return { success: true, contributors };
+    } catch (err) {
+        return { success: false, error: "Failed to load contributors" };
     }
 }
 

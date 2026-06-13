@@ -2,8 +2,9 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { X, Share2, Download, Clock, Copy, Check, UploadCloud, Lock, Shield, Search, UserPlus, Users } from "lucide-react";
-import { createShareLink, searchUsersAction, shareBulkMedia, updateAlbumContributors } from "@/server/actions/share-actions";
+import { createShareLink, searchUsersAction, shareBulkMedia, updateAlbumContributors, getAlbumContributors } from "@/server/actions/share-actions";
 import { useNotification } from "../providers/NotificationProvider";
+import { useSession } from "next-auth/react";
 
 interface ShareModalProps {
     targetId?: string;
@@ -34,6 +35,18 @@ export default function ShareModal({ targetId, selectedIds, type, onClose, onSuc
     const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [selectedUsers, setSelectedUsers] = useState<{ id: string; username: string; role: 'viewer' | 'contributor' | 'co_owner' }[]>([]);
+    const { data: session } = useSession();
+    const isAlbum = type === 'album' || (selectedIds && selectedIds.length > 1);
+    
+    useEffect(() => {
+        if (isAlbum && targetId) {
+            getAlbumContributors(targetId).then(res => {
+                if (res.success && res.contributors) {
+                    setSelectedUsers(res.contributors);
+                }
+            });
+        }
+    }, [targetId, isAlbum]);
 
     useEffect(() => {
         if (searchQuery.length < 2) {
@@ -45,7 +58,7 @@ export default function ShareModal({ targetId, selectedIds, type, onClose, onSuc
             setIsSearching(true);
             const res = await searchUsersAction(searchQuery);
             if (res.success) {
-                const filtered = res.users.filter((u: any) => !selectedUsers.find(su => su.id === u.id));
+                const filtered = res.users.filter((u: any) => u.id !== session?.user?.id && !selectedUsers.find(su => su.id === u.id));
                 setSearchResults(filtered);
             }
             setIsSearching(false);
@@ -101,7 +114,6 @@ export default function ShareModal({ targetId, selectedIds, type, onClose, onSuc
         setTimeout(() => setCopied(false), 2000);
     };
     
-    const isAlbum = type === 'album' || (selectedIds && selectedIds.length > 1);
 
     return (
         <div className="fixed inset-0 z-[120] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">

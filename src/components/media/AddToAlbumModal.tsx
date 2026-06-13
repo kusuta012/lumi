@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { X, FolderPlus, Library } from "lucide-react";
-import { addToAlbumAction, addMediaToExistingAlbumAction } from "@/server/actions/album-actions";
+import { X, FolderPlus, Library, Users } from "lucide-react";
+import { addToAlbumAction, addMediaToExistingAlbumAction, getAvailableAlbum } from "@/server/actions/album-actions";
 import { useNotification } from "../providers/NotificationProvider";
 
 interface Props {
@@ -18,7 +18,7 @@ export default function AddToAlbumModal({ selectedIds, onClose, onSuccess }: Pro
     const { notify } = useNotification();
 
     useEffect(() => {
-        fetch('/api/albums').then(res => res.json()).then(setExistingAlbums);
+        getAvailableAlbum().then(setExistingAlbums);
     }, []);
 
     const createWithIds = async (prevState: any, formData: FormData) => {

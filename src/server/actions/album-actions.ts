@@ -1,15 +1,16 @@
 "use server";
 
 import { db } from "@/db";
-import { albums, albumMedia, media } from "@/db/schema";
+import { albums, albumMedia, media, albumContributors } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { addMediaToPipe } from "@/lib/queue";
 import { cacheInvalid } from "@/lib/cache";
 import { logAuditEvent } from "@/lib/audit";
 import { broadcastAlbumUpdate } from "@/lib/pubsub";
 import { getAlbumRole, hasPermission } from "../services/rbac";
+import { Owner$ } from "@aws-sdk/client-s3";
 
 
 export async function addToAlbumAction(mediaIds: string[], albumName: string) {
@@ -70,7 +71,7 @@ export async function addMediaToExistingAlbumAction(albumId: string, mediaIds: s
             return { success: false, error: "You do not have permission to add photos to this album" };
         }
         const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
-        if (!album || album.ownerId !== session.user.id) throw new Error("Not found");
+        if (!album) throw new Error("Not found");
 
         const entries = mediaIds.map((id) => ({ albumId, mediaId: id }));
         await db.insert(albumMedia).values(entries).onConflictDoNothing();
@@ -83,7 +84,7 @@ export async function addMediaToExistingAlbumAction(albumId: string, mediaIds: s
         revalidatePath(`/albums/${albumId}`);
         return { success: true };
     } catch (error) {
-        return { error: "Failed to adf to album"};
+        return { success: false, error: "Failed to add to album"};
     }
 }
 
@@ -169,4 +170,31 @@ export async function uploadNewCoverAction(albumId: string, data: { filename: st
         console.error("cover upload error", error);
         return { success: false, error:  "Failed to upload cover"}
     }
+}
+
+export async function getAvailableAlbum() {
+    const session = await auth();
+    if (!session?.user?.id) return [];
+
+    const owned = await db.query.albums.findMany({
+        where: eq(albums.ownerId, session.user.id),
+        orderBy: [desc(albums.createdAt)]
+    });
+
+    const contributed = await db.select({
+        id: albums.id,
+        name: albums.name,
+        ownerId: albums.ownerId,
+        coverMediaId: albums.coverMediaId,
+        description: albums.description,
+        createdAt: albums.createdAt
+    }).from(albums)
+    .innerJoin(albumContributors, eq(albumContributors.albumId, albums.id))
+    .where(and(
+        eq(albumContributors.userId, session.user.id),
+        inArray(albumContributors.role, ['contributor', 'co_owner'])
+    ));
+
+    const all = [...owned, ...contributed];
+    return all.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
 }
