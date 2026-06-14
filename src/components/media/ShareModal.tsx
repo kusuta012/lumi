@@ -12,6 +12,7 @@ interface ShareModalProps {
     type: 'media' | 'album';
     onClose: () => void;
     onSuccess?: () => void;
+    currentRole?: string;
 }
 
 interface SearchUser {
@@ -20,7 +21,7 @@ interface SearchUser {
     email: string;
 }
 
-export default function ShareModal({ targetId, selectedIds, type, onClose, onSuccess }: ShareModalProps) {
+export default function ShareModal({ targetId, selectedIds, type, onClose, onSuccess, currentRole = 'viewer' }: ShareModalProps) {
     const { notify } = useNotification();
     const [isPending, startTransition] = useTransition();
     const [activeTab, setActiveTab] = useState<'link' | 'invite'>(type === 'album' ? 'invite' : 'link');
@@ -37,16 +38,18 @@ export default function ShareModal({ targetId, selectedIds, type, onClose, onSuc
     const [selectedUsers, setSelectedUsers] = useState<{ id: string; username: string; role: 'viewer' | 'contributor' | 'co_owner' }[]>([]);
     const { data: session } = useSession();
     const isAlbum = type === 'album' || (selectedIds && selectedIds.length > 1);
+    const canManagePublicLinks = currentRole === 'owner' || currentRole === 'co_owner';
     
     useEffect(() => {
         if (isAlbum && targetId) {
             getAlbumContributors(targetId).then(res => {
-                if (res.success && res.contributors) {
-                    setSelectedUsers(res.contributors);
+                if (res.success){
+                    const others = (res.contributors as any[]).filter(c => c.id !== session?.user?.id);
+                    setSelectedUsers(others);
                 }
             });
         }
-    }, [targetId, isAlbum]);
+    }, [targetId, isAlbum, session?.user?.id]);
 
     useEffect(() => {
         if (searchQuery.length < 2) {
@@ -131,9 +134,11 @@ export default function ShareModal({ targetId, selectedIds, type, onClose, onSuc
                         <button onClick={() => setActiveTab('invite')} className={`flex-1 py-3 text-xs font-bold tracking-wider transition-colors ${activeTab === 'invite' ? 'text-orange-500 border-b-2 border-orange-500' : 'text-muted hover:text-foreground'}`}>
                             Invite People
                         </button>
-                        <button onClick={() => setActiveTab('link')} className={`flex-1 py-3 text-xs font-bold tracking-wider transition-colors ${activeTab === 'link' ? 'text-orange-500 border-b-2 border-orange-500' : 'text-muted hover:text-foreground'}`}>
-                            Public Link
-                        </button>
+                        {canManagePublicLinks && (
+                            <button onClick={() => setActiveTab('link')} className={`flex-1 py-3 text-xs font-bold tracking-wider transition-colors ${activeTab === 'link' ? 'text-orange-500 border-b-2 border-orange-500' : 'text-muted hover:text-foreground'}`}>
+                                Public Link
+                            </button>
+                        )}
                     </div>
                 )}
                 <div className="p-6">
@@ -260,7 +265,9 @@ export default function ShareModal({ targetId, selectedIds, type, onClose, onSuc
                                                 className="bg-background border border-border text-xs font-medium text-foreground py-1 px-2 rounded outline-none focus:border-orange-500">
                                                     <option value="viewer">Viewer</option>
                                                     <option value="contributor">Contributor</option>
-                                                    <option value="co_owner">Co-owner</option>
+                                                    {currentRole === 'owner' && (
+                                                        <option value="co_owner">Co-owner</option>
+                                                    )}
                                                 </select>
                                                 <button onClick={() => setSelectedUsers(selectedUsers.filter(u => u.id !== user.id))} className="text-muted hover:text-red-400 transition-colors p-1">
                                                     <X size={14} />

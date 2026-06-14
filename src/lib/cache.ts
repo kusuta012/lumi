@@ -58,7 +58,7 @@ export const cacheInvalid = {
         await Promise.allSettled(keys.map(key => redisCache.del(key)));
     },
     async onAlbumChanged(userId: string) {
-        await redisCache.del(`user_albums_grid:${userId}`);
+        await redisCache.del(`user_albums_grid_rbac:${userId}`);
     },
     async onAimetaChanged(userId: string) {
         const keys = [

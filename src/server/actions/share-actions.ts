@@ -6,9 +6,10 @@ import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { addMediaToPipe } from "@/lib/queue";
-import { eq, sql, and, ilike, not, or } from "drizzle-orm";
+import { eq, sql, and, ilike, not, or, notInArray } from "drizzle-orm";
 import { broadcastAlbumUpdate } from "@/lib/pubsub";
 import { getAlbumRole, hasPermission } from "../services/rbac";
+import { cacheInvalid } from "@/lib/cache";
 
 export async function createShareLink(data: {
     targetType: 'media' | 'album';
@@ -154,17 +155,28 @@ export async function updateAlbumContributors(albumId: string,
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
-    const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
-    if (!album || album.ownerId !== session.user.id) throw new Error("Forbidden");
+    const requesterRole = await getAlbumRole(albumId, session.user.id);
+    if (!hasPermission(requesterRole, 'manage')) throw new Error("Forbidden");
+
+    if (requesterRole === 'co_owner') {
+        const hasEscalation = contributors.some(c => c.role === 'co_owner');
+        if (hasEscalation) return { success: false, error: "Co-owners cannot grant co-owner privileges" };
+    }
 
     try {
         await db.transaction(async (tx) => {
-            await tx.delete(albumContributors).where(eq(albumContributors.albumId, albumId));
+            await tx.delete(albumContributors).where(and(eq(albumContributors.albumId, albumId), not(eq(albumContributors.userId, session.user.id))));
             if (contributors.length > 0) {
-                const entries = contributors.map(c => ({ albumId, userId: c.userId, role: c.role }));
-                await tx.insert(albumContributors).values(entries);
+                const others = contributors.filter(c => c.userId !== session.user.id);
+                if (others.length > 0) {
+                    const entries = contributors.map(c => ({ albumId, userId: c.userId, role: c.role }));
+                    await tx.insert(albumContributors).values(entries);
+                }
             }
         });
+        await Promise.allSettled(
+            contributors.map(c => cacheInvalid.onAlbumChanged(c.userId))
+        );
         await broadcastAlbumUpdate(albumId);
         return { success: true };
     } catch (err) {
@@ -188,12 +200,20 @@ export async function deleteShareLink(linkId: string) {
     }
 }
 
-export async function searchUsersAction(query: string) {
+export async function searchUsersAction(query: string, albumId?: string) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
     if (!query || query.length < 2) return { success: true, users: [] };
 
     try {
+
+        let excludedIds = [session.user.id];
+        if (albumId) {
+            const existing = await db.select({ id: albumContributors.userId })
+                .from(albumContributors).where(eq(albumContributors.albumId, albumId));
+            excludedIds.push(...existing.map(e => e.id));
+        }
+
         const foundUsers = await db.select({
             id: users.id,
             username: users.username,
@@ -201,7 +221,7 @@ export async function searchUsersAction(query: string) {
         })
         .from(users)
         .where(and(
-            not(eq(users.id, session.user.id)),
+            notInArray(users.id, excludedIds),
             or(
                 ilike(users.username, `%${query}%`),
                 ilike(users.email, `%${query}%`)

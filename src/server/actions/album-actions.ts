@@ -149,6 +149,10 @@ export async function uploadNewCoverAction(albumId: string, data: { filename: st
     if (!session?.user?.id) throw new Error("Unauthorized");
 
     try {
+        const role = await getAlbumRole(albumId, session.user.id);
+        if (!hasPermission(role, 'manage')) {
+            return { success: false, error: "Unauthroized" };
+        }
         const [newMedia] = await db.insert(media).values({
             ownerId: session.user.id,
             filename: data.filename,

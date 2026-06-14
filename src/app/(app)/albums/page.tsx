@@ -1,6 +1,6 @@
 import { db } from "@/db"
-import { eq, and, desc } from "drizzle-orm";
-import { albums } from "@/db/schema";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { albumContributors, albums } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { Library} from "lucide-react";
 import CreateAlbumButton from "@/components/albums/CreateAlbumButton";
@@ -15,10 +15,34 @@ export default async function AlbumsPage() {
     let userAlbums = await redisCache.get(cacheKey);
 
     if (!userAlbums) {
-        userAlbums = await db.query.albums.findMany({
-            where: eq(albums.ownerId, session.user.id),
-            orderBy: [desc(albums.createdAt)],
-        });
+        const ownedPromise = db.select({
+            id: albums.id,
+            name: albums.name,
+            description: albums.description,
+            coverMediaId: albums.coverMediaId,
+            ownerId: albums.ownerId,
+            createdAt: albums.createdAt,
+            role: sql<string>`'owner'`,
+        })
+        .from(albums)
+        .where(eq(albums.ownerId, session.user.id))
+        
+        const contributedPromise = db.select({
+            id: albums.id,
+            name: albums.name,
+            description: albums.description,
+            coverMediaId: albums.coverMediaId,
+            ownerId: albums.ownerId,
+            createdAt: albums.createdAt,
+            role: albumContributors.role,
+        })
+        .from(albums)
+        .innerJoin(albumContributors, eq(albumContributors.albumId, albums.id))
+        .where(eq(albumContributors.userId, session.user.id));
+
+        const [owned, contributed] = await Promise.all([ownedPromise, contributedPromise]);
+
+        userAlbums = [...owned, ...contributed].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         await redisCache.set(cacheKey, userAlbums, 3600);
     }
 
@@ -45,7 +69,7 @@ export default async function AlbumsPage() {
             ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
                     {userAlbums.map((album: any) => (
-                        <AlbumCard key={album.id} album={album} />
+                        <AlbumCard key={album.id} album={album} role={album.role} />
                     ))}
                 </div>
             )}  

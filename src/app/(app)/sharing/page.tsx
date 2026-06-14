@@ -46,9 +46,18 @@ export default async function SharingPage() {
             </div>
         ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                {sharedWithMe.map(album => (
-                    <AlbumCard key={album.id} album={album} />
-                ))}
+                {sharedWithMe.map(album => {
+                    let currentRole = 'viewer';
+                    if (album.ownerId === session?.user?.id) {
+                        currentRole = 'owner';
+                    } else {
+                      const contribution = contributions.find(c => c.albumId === album.id);
+                      if (contribution) {
+                        currentRole = contribution.role;
+                      } 
+                    }
+                    return <AlbumCard key={album.id} album={album} role={currentRole} />
+                })}
             </div>
         )}
       </section>
