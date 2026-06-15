@@ -412,6 +412,7 @@ export async function processAiIndexing(mediaId: string) {
     let aiTags: string[] = [];
     let detectedFaces: any[] = [];
     let extractedText: string | null = null;
+    let aestheticScore: number | null = null;
     const isVideo = item.mimetype.startsWith("video/")
 
     let buffer: Buffer;
@@ -442,6 +443,7 @@ export async function processAiIndexing(mediaId: string) {
           aiTags = aiData.tags || [];
           detectedFaces = aiData.faces || [];
           extractedText = aiData.extractedText || null;
+          aestheticScore = aiData.aestheticScore ?? null;
         } else {
             console.error("AI analysis failed", aiResp.status);
         }
@@ -455,6 +457,7 @@ export async function processAiIndexing(mediaId: string) {
         clipEmbedding,
         blurScore,
         extractedText,
+        aestheticScore,
       })
       .where(eq(media.id, item.id));
 

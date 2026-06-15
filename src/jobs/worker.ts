@@ -9,6 +9,7 @@ import path from "path";
 import { processTakeout } from "@/server/services/takeout-processor";
 import { systemQueue } from "@/lib/queue";
 import { SystemBackupJob } from "@/server/services/system-backup";
+import { aestheticBackfill } from "@/server/services/backfill";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -44,6 +45,9 @@ const systemWorker = new Worker(
         if (job.name === "database-backup") {
             await SystemBackupJob(job.data?.userId);
         }
+        if (job.name === "aesthetic-backfill") {
+            await aestheticBackfill(job);
+        }
     }, { connection, concurrency: 1 });
 
 function logging(worker: Worker, name: string) {
@@ -66,7 +70,11 @@ console.log('lumi migration worker is active');
 
 systemQueue.add("database-backup", { userId: "system_cron" }, {
     repeat: { pattern: "0 3 * * *" }
-}); 
+});
+systemQueue.add("aesthetic-backfill", {}, {
+    repeat: { pattern: "30 3 * * *" },
+    jobId: "cutie-aesthetic-backfill"
+}) 
 
 cleanExpiredTrash();
 setInterval(() => {

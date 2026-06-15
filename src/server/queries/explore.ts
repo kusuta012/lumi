@@ -20,6 +20,7 @@ export interface HighlightItem {
     createdAt: string;
     dateTaken: string | null;
     blurScore: number | null;
+    aestheticScore: number | null;
 }
 
 export interface PlaceHighlight {
@@ -68,17 +69,32 @@ export async function getRcntHighlights(userId: string): Promise<HighlightItem[]
     const thirtyDaysAgooo = new Date();
     thirtyDaysAgooo.setDate(thirtyDaysAgooo.getDate() - 30);
 
-    const results = await db.query.media.findMany({
+    let results = await db.query.media.findMany({
         where: and(
             eq(media.ownerId, userId),
             eq(media.isDeleted, false),
             eq(media.isLocked, false),
-            isNotNull(media.blurScore),
+            isNotNull(media.aestheticScore),
+            gt(media.aestheticScore, 50),
             gt(media.createdAt, thirtyDaysAgooo)
         ),
-        orderBy: [desc(media.blurScore)],
+        orderBy: [desc(media.aestheticScore)],
         limit: 20
     });
+
+    if (results.length < 5) {
+        results = await db.query.media.findMany({
+            where: and(
+                eq(media.ownerId, userId),
+                eq(media.isDeleted, false),
+                eq(media.isLocked, false),
+                isNotNull(media.blurScore),
+                gt(media.createdAt, thirtyDaysAgooo)
+            ),
+            orderBy: [desc(media.blurScore)],
+            limit: 20
+        })
+    }
 
     const serializable = results.map(r => ({
         id: r.id,
@@ -89,7 +105,8 @@ export async function getRcntHighlights(userId: string): Promise<HighlightItem[]
         height: r.height,
         createdAt: r.createdAt.toISOString(),
         dateTaken: r.dateTaken ? r.dateTaken.toISOString() : null,
-        blurScore: r.blurScore
+        blurScore: r.blurScore,
+        aestheticScore: r.aestheticScore
     }));
     await redisCache.set(cacheKey, serializable, 3600);
     return results as unknown as HighlightItem[];

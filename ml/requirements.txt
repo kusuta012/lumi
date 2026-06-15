@@ -5,11 +5,10 @@ torchvision
 transformers
 opencv-python-headless
 Pillow
-facenet-pytorch
 pydantic
-requests
 python-multipart
 easyocr
 insightface
 onnxruntime
 optimum[onnxruntime]
+pyiqa

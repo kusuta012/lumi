@@ -4,7 +4,6 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import cv2 
 import numpy as np
-import requests
 from PIL import Image
 import io
 import torch
@@ -13,6 +12,7 @@ from insightface.app import FaceAnalysis
 import easyocr
 import os
 import asyncio
+import torchvision.transforms.functional as TF
 
 cores_c = min(4, os.cpu_count() or 4)
 torch.set_num_threads(cores_c)
@@ -41,8 +41,23 @@ face_analysis = FaceAnalysis(name='buffalo_sc', root='.', providers=onnx_provide
 face_analysis.prepare(ctx_id=0, det_size=(640, 640))
 
 reader = easyocr.Reader(['en'], gpu=(device == "cuda"))
+nima_available = False
+nima_metric = None
+try:
+    import pyiqa
+    nima_metric = pyiqa.create_metric('nima', device=device)
+    nima_available = True
+except Exception as e:
+    print(f"NIMA model failed to load: {e}")
 
 print("ai models loaded")
+
+def calc_aesthetic_score(pil_image: Image.Image) -> float:
+    img_tensor = TF.to_tensor(pil_image).unsqueeze(0).to(device)
+    with torch.inference_mode():
+        raw_score = nima_metric(img_tensor).item()
+    normalized = max(0.0, min(100.0, (raw_score - 1.0) * (100.0 / 9.0)))
+    return round(normalized, 2)
 
 class TextRequest(BaseModel):
     text: str
@@ -56,7 +71,7 @@ def encode_text(req: TextRequest):
     try:
         inputs = clip_processor(text=[req.text], return_tensors="pt", padding=True).to(device)
         with torch.inference_mode():
-            text_features = clip_model. get_text_features(**inputs)
+            text_features = clip_model.get_text_features(**inputs)
             text_features = text_features / text_features.norm(p=2, dim=-1, keepdim=True)  
 
         return {"embedding": text_features[0].cpu().numpy().tolist()}
@@ -101,6 +116,9 @@ async def analyze_image(file: UploadFile = File(...)):
 
         faces_task = asyncio.to_thread(extract_faces)
         ocr_task = asyncio.to_thread(extract_ocr)
+        nima_task = None
+        if nima_available:
+            nima_task = asyncio.to_thread(calc_aesthetic_score, pil_image)
 
         clip_inputs = clip_processor(images=pil_image, return_tensors="pt").to(device)
         with torch.inference_mode():
@@ -130,14 +148,34 @@ async def analyze_image(file: UploadFile = File(...)):
 
         faces_data = await faces_task
         extracted_text = await ocr_task
+        aesthetic_score = None
+        if nima_task is not None:
+            try:
+                aesthetic_score = await nima_task
+            except Exception as e:
+                print(f"nima scoring failed: {e}")
         
         return {
             "blurScore": float(blur_score),
             "clipEmbedding": clip_embedding,
             "tags": list(set(tags)),
             "faces": faces_data,
-            "extractedText": extracted_text
+            "extractedText": extracted_text,
+            "aestheticScore": aesthetic_score
         }
     except Exception as e:
         print(f"analysis failed {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/score/aesthetic")
+async def score_aesthetic(file: UploadFile = File(...)):
+    if not nima_available:
+        raise HTTPException(status_code=503, detail="NIMA model not available")
+    
+    try:
+        image_bytes = await file.read()
+        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        score = await asyncio.to_thread(calc_aesthetic_score, pil_image)
+        return {"aestheticScore": score}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

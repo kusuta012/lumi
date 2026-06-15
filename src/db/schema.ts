@@ -115,6 +115,7 @@ export const media = pgTable('media', {
     isEncrypted: boolean('is_encrypted').default(true),
     isLocked: boolean('is_locked').default(false),
     blurScore: real('blue_score'),
+    aestheticScore: real('aesthetic_score'),
     clipEmbedding: clipVector('clip_embedding'),
     extractedText: text('extracted_text'),
     hoverSpriteKey: text('hover_sprite_key'),
@@ -126,7 +127,8 @@ export const media = pgTable('media', {
     index('media_date_idx').on(table.dateTaken, table.createdAt),
     index('media_hash_idx').on(table.hash),
     index('media_favorites.idx').on(table.ownerId, table.isFavorited),
-    index('media_hnsw_idx').using('hnsw', table.clipEmbedding.op('vector_cosine_ops'))
+    index('media_hnsw_idx').using('hnsw', table.clipEmbedding.op('vector_cosine_ops')),
+    index('media_aesthetic_idx').on(table.ownerId, table.aestheticScore)
 ]);
 
 export const albums = pgTable('albums', {
