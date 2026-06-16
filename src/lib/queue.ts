@@ -31,6 +31,14 @@ export const migrationQueue = new Queue('storage-migration', {
     defaultJobOptions: { attempts: 1 }
 });
 
+export const faceClusterQueue = new Queue('face-clustering', {
+    connection,
+    defaultJobOptions: {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 5000},
+    }
+});
+
 export async function addMediaToPipe(mediaId: string) {
     await metadataQueue.add("extract", { mediaId });
 }

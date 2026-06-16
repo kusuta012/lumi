@@ -1,6 +1,6 @@
 "use server";
 
-import { metadataQueue, thumbnailQueue, aiQueue, migrationQueue } from "@/lib/queue";
+import { metadataQueue, thumbnailQueue, aiQueue, migrationQueue, faceClusterQueue } from "@/lib/queue";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 
@@ -14,7 +14,7 @@ async function ensureSuperAdmin() {
 export async function getQueueStats() {
     await ensureSuperAdmin();
     try {
-        const [metadataCounts, thumbnailCounts, aiCounts, migrationCounts, isMetadataPaused, isThumbnailPaused, isAiPaused, isMigrationPaused] = await Promise.all([
+        const [metadataCounts, thumbnailCounts, aiCounts, migrationCounts, faceClusterCounts, isMetadataPaused, isThumbnailPaused, isAiPaused, isMigrationPaused, isFaceClusterPaused] = await Promise.all([
             metadataQueue.getJobCounts(),
             thumbnailQueue.getJobCounts(),
             aiQueue.getJobCounts(),
@@ -22,7 +22,9 @@ export async function getQueueStats() {
             metadataQueue.isPaused(),
             thumbnailQueue.isPaused(),
             aiQueue.isPaused(),
-            migrationQueue.isPaused()
+            migrationQueue.isPaused(),
+            faceClusterQueue.getJobCounts(),
+            faceClusterQueue.isPaused(),
         ]);
 
         return {
@@ -51,6 +53,12 @@ export async function getQueueStats() {
                     displayName: "Storage Migrator",
                     counts: migrationCounts,
                     isPaused: isMigrationPaused
+                },
+                {
+                    name: "face-clustering",
+                    displayName: "Face Cluster",
+                    counts: faceClusterCounts,
+                    isPaused: isFaceClusterPaused
                 }
             ]
         };
@@ -72,6 +80,8 @@ export async function manageQueue(queueName: string, action: 'retry' | 'clean' |
         queue = aiQueue;
     } else if (queueName === "storage-migration") {
         queue = migrationQueue;
+    } else if (queueName === "face-clustering") {
+        queue = faceClusterQueue;
     } else {
         return { success: false, error: "Invalid queue name" };
     }

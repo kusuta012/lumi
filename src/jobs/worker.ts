@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { Worker } from 'bullmq';
+import { Job, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { processMediaItem, processThumbnails, processAiIndexing } from '@/server/services/processor';
 import { env } from '@/lib/env'
@@ -10,6 +10,8 @@ import { processTakeout } from "@/server/services/takeout-processor";
 import { systemQueue } from "@/lib/queue";
 import { SystemBackupJob } from "@/server/services/system-backup";
 import { aestheticBackfill } from "@/server/services/backfill";
+import { faceClustering } from "@/server/services/face-cluster";
+import { faceClusterQueue } from "@/lib/queue";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -50,6 +52,14 @@ const systemWorker = new Worker(
         }
     }, { connection, concurrency: 1 });
 
+const faceClusterWorker = new Worker(
+    'face-clustering',
+    async (job) => {
+        await faceClustering(job);
+    },
+    { connection, concurrency: 1 }
+);
+
 function logging(worker: Worker, name: string) {
     worker.on('completed', (job) => console.log(`[${name} job ${job.id}] completed`));
     worker.on('failed', (job, err) => console.error([`${name} job ${job?.id} Failed:`, err]));
@@ -75,6 +85,7 @@ systemQueue.add("aesthetic-backfill", {}, {
     repeat: { pattern: "30 3 * * *" },
     jobId: "cutie-aesthetic-backfill"
 }) 
+
 
 cleanExpiredTrash();
 setInterval(() => {
