@@ -123,8 +123,7 @@ export const media = pgTable('media', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
 }, (table) => [
-    index('media_timeline_idx').on(table.ownerId, table.isDeleted, table.isArchived, table.isLocked),
-    index('media_date_idx').on(table.dateTaken, table.createdAt),
+    index('media_timeline_idx').on(table.ownerId, table.isDeleted, table.isArchived, table.isLocked, table.dateTaken.desc(), table.createdAt.desc()),
     index('media_hash_idx').on(table.hash),
     index('media_favorites.idx').on(table.ownerId, table.isFavorited),
     index('media_hnsw_idx').using('hnsw', table.clipEmbedding.op('vector_cosine_ops')),

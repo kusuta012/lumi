@@ -12,7 +12,7 @@ import fs from "fs/promises";
 import { createReadStream, createWriteStream} from "fs";
 import path from "path";
 import os from "os";
-import { redisCache, cacheInvalid } from "@/lib/cache";
+import { redisCache, cacheInvalid, cacheRedis } from "@/lib/cache";
 import crypto from "crypto";
 import { env } from "@/lib/env"
 import { thumbnailQueue, aiQueue } from "@/lib/queue";
@@ -81,7 +81,7 @@ export async function processMediaItem(mediaId: string) {
       const writeStream  = createWriteStream(localInput);
       
       await new Promise((resolve, reject) => {
-        objStream.on('data', (chunk) => {
+        objStream.on('data', (chunk: Buffer) => {
             hash.update(chunk);
             writeStream.write(chunk);
         });
@@ -524,8 +524,12 @@ export async function processAiIndexing(mediaId: string) {
           .where(eq(albumMedia.mediaId, item.id));
       
       for (const link of linkedAlbums) {
-          await broadcastAlbumUpdate(link.albumId);
-      }
+                const lockKey = `throttle:album_broadcast:${link.albumId}`;
+                const shouldBroadcast = await cacheRedis.set(lockKey, "1", "EX", 3, "NX");
+                if (shouldBroadcast) {
+                  await broadcastAlbumUpdate(link.albumId);
+                }
+            }
 
       console.log(`processed ${isVideo ? 'video' : 'image'}: ${item.filename}`);
       await cacheInvalid.onMediaChanged(item.ownerId, item.id, item.gpsLat !== null && item.gpsLng !== null);

@@ -6,7 +6,7 @@ import { eq, and, inArray, notInArray, sql, count, lt } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { getStorageClient } from "@/lib/storage";
-import { redisCache, cacheInvalid } from "@/lib/cache";
+import { redisCache, cacheInvalid, cacheRedis } from "@/lib/cache";
 import { subDays } from "date-fns";
 
 async function verifyOwnership(mediaId: string) {
@@ -96,7 +96,11 @@ export async function deletePermanentlyAction(mediaIds: string[]) {
   const result = await purgeMediaItemsSys(verifiedIds, session.user.id);
   if (result.success) {
     await cacheInvalid.onMediaChanged(session.user.id, undefined, true);
-    await Promise.allSettled(verifiedIds.map(id => cacheInvalid.onMediaChanged(session.user.id, id)));
+    if (verifiedIds.length > 0) {
+      const pipeline = cacheRedis.pipeline();
+      verifiedIds.forEach(id => pipeline.del(`media_meta:${id}`));
+      await pipeline.exec();
+    }
   }
 
   return result;
@@ -218,7 +222,11 @@ export async function cleanExpiredTrash() {
     for (const [ownerId, ids] of Object.entries(itemsByOwner)) {
       await purgeMediaItemsSys(ids, ownerId);
       await cacheInvalid.onMediaChanged(ownerId, undefined, true);
-      await Promise.allSettled(ids.map(id => cacheInvalid.onMediaChanged(ownerId, id)));
+      if (ids.length > 0) {
+        const pipeline = cacheRedis.pipeline();
+        ids.forEach(id => pipeline.del(`media_meta:${id}`));
+        await pipeline.exec();
+      }
     }
   } catch (err) {
     console.error("trash clean failed", err);

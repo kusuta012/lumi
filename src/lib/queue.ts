@@ -43,6 +43,8 @@ export const faceClusterQueue = new Queue('face-clustering', {
 
 export const GtakeoutQueue = new Queue('takeout-import', { connection, defaultJobOptions });
 
+export const sysCleanupQueue = new Queue('system-cleanup', { connection });
+
 export async function addMediaToPipe(mediaId: string) {
     await metadataQueue.add("extract", { mediaId });
 }

@@ -13,6 +13,9 @@ import { aestheticBackfill } from "@/server/services/backfill";
 import { faceClustering } from "@/server/services/face-cluster";
 import { faceClusterQueue } from "@/lib/queue";
 import { GTakeoutImport } from "@/server/services/takeout-importer";
+import { sysCleanupQueue } from "@/lib/queue";
+import fs from "fs/promises";
+import os from "os";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -67,6 +70,29 @@ const takeoutImportWorker = new Worker(
     { connection, concurrency: 1 }
 );
 
+const sysCleanupWorker = new Worker(
+    'system-cleanup',
+    async () => {
+        const tmpDir = os.tmpdir();
+        const files = await fs.readdir(tmpDir);
+        const now = Date.now();
+        const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+        for (const file of files) {
+            if (file.startsWith("lumi-pipe-") || file.startsWith("lumi-takeout-")) {
+                const fullPath = path.join(tmpDir, file);
+                const stats = await fs.stat(fullPath);
+                if (now - stats.mtimeMs > MAX_AGE_MS) {
+                    await fs.rm(fullPath, { recursive: true, force: true });
+                    console.log(`removed orphan tmep dir: ${file}`);
+                }
+            }
+        }
+    },
+    { connection, concurrency: 1 }
+);
+
+
 function logging(worker: Worker, name: string) {
     worker.on('completed', (job) => console.log(`[${name} job ${job.id}] completed`));
     worker.on('failed', (job, err) => console.error([`${name} job ${job?.id} Failed:`, err]));
@@ -79,6 +105,7 @@ logging(takeoutWorker, "Takeout");
 logging(systemWorker, "System");
 logging(faceClusterWorker, "Face Cluster");
 logging(takeoutImportWorker, "Takeout Import" );
+logging(sysCleanupWorker, "System Cleanup");
 
 console.log('lumi workers are active')
 const migrator = new Worker('storage-migration', async (job) => {
@@ -95,6 +122,10 @@ systemQueue.add("aesthetic-backfill", {}, {
     jobId: "cutie-aesthetic-backfill"
 }) 
 
+sysCleanupQueue.add('daily-cleanup', {}, {
+    repeat: { pattern: '0 4 * * *' },
+    jobId: 'daily-tmp-cleanup'
+});
 
 cleanExpiredTrash();
 setInterval(() => {

@@ -6,11 +6,17 @@ export async function checkRateLimit(action: string, limit: number, windowSecond
         const headerList = await headers();
         const ip = headerList.get("x-forwarded-for") || headerList.get("x-real-ip") || "unknown_ip";
         const key = `ratelimit:${action}:${ip}`;
-        const current = await cacheRedis.incr(key);
 
-        if (current === 1) {
-            await cacheRedis.expire(key, windowSeconds);
+        const results = await cacheRedis.multi()
+            .incr(key)
+            .expire(key, windowSeconds, 'NX')
+            .exec();
+        
+        if (!results || results.length === 0) {
+            return { allowed: true, ttl: 0, current: 0 };
         }
+        
+        const current = results[0][1] as number;
 
         if (current > limit) {
             const ttl = await cacheRedis.ttl(key);
