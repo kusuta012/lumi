@@ -1,6 +1,8 @@
 import { Queue, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
 import { env } from './env';
+import { GTakeoutImport } from '@/server/services/takeout-importer';
+import { concurrency } from 'sharp';
 
 const connection = new IORedis(env.REDIS_URL, {
     maxRetriesPerRequest: null,
@@ -38,6 +40,8 @@ export const faceClusterQueue = new Queue('face-clustering', {
         backoff: { type: 'exponential', delay: 5000},
     }
 });
+
+export const GtakeoutQueue = new Queue('takeout-import', { connection, defaultJobOptions });
 
 export async function addMediaToPipe(mediaId: string) {
     await metadataQueue.add("extract", { mediaId });

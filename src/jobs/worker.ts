@@ -12,6 +12,7 @@ import { SystemBackupJob } from "@/server/services/system-backup";
 import { aestheticBackfill } from "@/server/services/backfill";
 import { faceClustering } from "@/server/services/face-cluster";
 import { faceClusterQueue } from "@/lib/queue";
+import { GTakeoutImport } from "@/server/services/takeout-importer";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -60,6 +61,12 @@ const faceClusterWorker = new Worker(
     { connection, concurrency: 1 }
 );
 
+const takeoutImportWorker = new Worker(
+    'takeout-import',
+    async (job) => { await GTakeoutImport(job); },
+    { connection, concurrency: 1 }
+);
+
 function logging(worker: Worker, name: string) {
     worker.on('completed', (job) => console.log(`[${name} job ${job.id}] completed`));
     worker.on('failed', (job, err) => console.error([`${name} job ${job?.id} Failed:`, err]));
@@ -70,6 +77,8 @@ logging(thumbnailWorker, "Thumbnail");
 logging(aiWorker, "AI index");
 logging(takeoutWorker, "Takeout");
 logging(systemWorker, "System");
+logging(faceClusterWorker, "Face Cluster");
+logging(takeoutImportWorker, "Takeout Import" );
 
 console.log('lumi workers are active')
 const migrator = new Worker('storage-migration', async (job) => {
