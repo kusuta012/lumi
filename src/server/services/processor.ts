@@ -97,8 +97,10 @@ export async function processMediaItem(mediaId: string) {
 
     const existingMedia = await db.query.media.findFirst({
         where: and(
+          eq(media.ownerId, item.ownerId),
           eq(media.hash, fileHash),
-          ne(media.hash, "pending")
+          ne(media.hash, "pending"),
+          ne(media.id, item.id),
         )
     });
 

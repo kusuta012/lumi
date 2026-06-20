@@ -1,12 +1,12 @@
 import { db } from "@/db";
 import { users, auditLogs } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gt } from "drizzle-orm";
 import { auth } from "@/server/auth";
-import { Settings, Package, Clock, ExternalLink } from "lucide-react";
+import { Settings, Package, Clock, ExternalLink, Loader2 } from "lucide-react";
 import MfaSetup from "@/components/profile/MfaSetup";
 import TakeoutBtn from "@/components/settings/TakeoutButton";
-import { format } from "date-fns";
-import { redirect } from "next/navigation";
+import { format, subDays } from "date-fns";
+import TakeoutImport from "@/components/settings/TakeoutImport";
 
 export default async function SettingsPg () {
     const session = await auth();
@@ -19,11 +19,18 @@ export default async function SettingsPg () {
     const completedTakeouts = await db.query.auditLogs.findMany({
         where: and(
             eq(auditLogs.actorId, session.user.id),
-            eq(auditLogs.action, "takeout_generated")
+            eq(auditLogs.action, "TAKEOUT_GENERATED"),
+            gt(auditLogs.createdAt, subDays(new Date(), 7))
         ),
         orderBy: [desc(auditLogs.createdAt)],
         limit: 5
     });
+
+    const lastRequest = await db.query.auditLogs.findFirst({
+        where: and(eq(auditLogs.actorId, session.user.id), eq(auditLogs.action, "TAKEOUT_REQUESTED")),
+        orderBy: [desc(auditLogs.createdAt)]
+    });
+    const isPending = lastRequest && (!completedTakeouts.length || lastRequest.createdAt > completedTakeouts[0].createdAt);
 
     return (
         <div className="p-8 max-w-3xl mx-auto space-y-12 text-foreground">
@@ -45,6 +52,8 @@ export default async function SettingsPg () {
                     </p>
                 </div>
                 <TakeoutBtn />
+                <div className="w-full h-px bg-border my-6"></div>
+                <TakeoutImport />
                 {completedTakeouts.length > 0 && (
                     <div className="mt-8 border border-border rounded-xl overflow-hidden bg-surface shadow-sm">
                         <div className="bg-surface-hover px-4 py-3 border-b border-border">

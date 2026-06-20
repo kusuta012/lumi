@@ -70,7 +70,9 @@ export async function GTakeoutImport(job: Job) {
         });
         const { client, bucket } = getStorageClient(defaultBackend?.config);
         const zipPath = path.join(workDir, "takeout.zip");
+        console.log(`download takeout zip from minio`)
         await client.fGetObject(bucket, objectKey, zipPath);
+        console.log(`Downloaded succesfully `)
         const extractDir = path.join(workDir, "extracted");
         await extractZip(zipPath, extractDir);
         const files = await catalogFiles(extractDir);
@@ -125,6 +127,7 @@ async function extractZip(zipPath: string, destDir: string): Promise<void> {
         createReadStream(zipPath)
             .pipe(unzipper.Extract({ path: destDir }))
             .on("close", resolve)
+            .on("finish", resolve)
             .on("error", reject);
     });
 }

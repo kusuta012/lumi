@@ -4,12 +4,28 @@ import { auth } from "@/server/auth";
 import { takeoutQueue } from "@/lib/queue";
 import { GtakeoutQueue } from "@/lib/queue";
 import { logAuditEvent } from "@/lib/audit";
+import { db } from "@/db";
+import { auditLogs } from "@/db/schema";
+import { eq, and , gt } from "drizzle-orm";
+import { subHours } from "date-fns";
 
 export async function requestTakeout() {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
     try {
+        const recentRequest = await db.query.auditLogs.findFirst({
+            where: and(
+                eq(auditLogs.actorId, session.user.id),
+                eq(auditLogs.action, "TAKEOUT_REQUESTED"),
+                gt(auditLogs.createdAt, subHours(new Date(), 24))
+            )
+        });
+
+        if (recentRequest) {
+            return { success: false, error: "You already have an export processing or completed from the last 24 hours." };
+        }
+
         await takeoutQueue.add("generate-zip", { userId: session.user.id });
         await logAuditEvent("takeout_requested", "system", session.user.id);
 
@@ -25,11 +41,15 @@ export async function requestTakeout() {
 export async function startGtakeoutImport(zipObjectKey: string) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
-
-    await GtakeoutQueue.add("googlu-import", {
-        userId: session.user.id,
-        objectKey: zipObjectKey
-    });
-    await logAuditEvent("g_takeout_started", "system", session.user.id);
-    return { success: true, message: "Import started... Check your library in a few minutes" };
+    try {
+        await GtakeoutQueue.add("googlu-import", {
+            userId: session.user.id,
+            objectKey: zipObjectKey
+        });
+        await logAuditEvent("g_takeout_started", "system", session.user.id);
+        return { success: true, message: "Import started... Check your library in a few minutes" };
+    } catch (err) {
+        console.error("Failed to queue import", err);
+        return { success: false, message: "", error: "Failed to queue import job" };
+    }
 }
