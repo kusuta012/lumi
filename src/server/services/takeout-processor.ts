@@ -24,6 +24,7 @@
             archive.outputStream.pipe(streamBridge);
             const zipFilename = `backups/${userId}/takeout-${Date.now()}.zip`;
             const uploadPromise = dest.client.putObject(dest.bucket, zipFilename, streamBridge as any);
+            const failedItems: string[] = [];
 
             for (const item of userMedia) {
                 const src = getStorageClient(item.storageBackend?.config);
@@ -32,7 +33,11 @@
                     archive.addReadStream(fileStream as any, `photos/${item.filename}`);
                 } catch (err) {
                     console.error(`takeout failed to fetch ${item.filename}`);
+                    failedItems.push(`Failed to include ${item.filename} minio object not found`)
                 }
+            }
+            if (failedItems.length > 0) {
+                archive.addBuffer(Buffer.from("The following files could not be exported due to storage errors:\n\n" + failedItems.join("\n")), "errors.txt");
             }
 
             const metadataDump = JSON.stringify(userMedia, null, 2);

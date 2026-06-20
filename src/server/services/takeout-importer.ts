@@ -88,12 +88,18 @@ export async function GTakeoutImport(job: Job) {
             columns: { storageUsed: true, storageQuota: true }
         });
         if (!user) throw new Error("User not found");
+
+        const quotaTracker = {
+            used: user.storageUsed || 0,
+            quota: user.storageQuota || 0
+        };
+        
         const albumCache = new Map<string, string>();
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
 
             try {
-                const result = await importSinFile(file, userId, client, bucket, defaultBackend?.id || null, albumCache);
+                const result = await importSinFile(file, userId, client, bucket, defaultBackend?.id || null, albumCache, quotaTracker);
                 if (result === "imported") stats.imported++;
                 else if (result === "duplicate") stats.duplicates++;
                 else if (result === "skipped") stats.skipped++;
@@ -194,7 +200,8 @@ async function importSinFile(
     storageClient: any,
     bucket: string,
     backendId: string | null,
-    albumCache: Map<string, string>
+    albumCache: Map<string, string>,
+    quotaTracker: { used: number, quota: number }
 ): Promise<"imported" | "duplicate" | "skipped"> {
     const filename = path.basename(file.diskPath);
     const ext = path.extname(filename).toLowerCase();
@@ -243,6 +250,10 @@ async function importSinFile(
     }
 
     const sizeInMB = Math.max(1, Math.round(fileBuffer.length / (1024 * 1024)));
+    if (quotaTracker.quota > 0 && (quotaTracker.used + sizeInMB) > quotaTracker.quota) {
+        console.warn(`skipped ${filename} - storage quota exeeced`);
+        return "skipped";
+    }
     const [newMedia] = await db.insert(media).values({
         ownerId: userId,
         filename,
@@ -257,7 +268,7 @@ async function importSinFile(
         caption,
         isFavorited,
     }).returning({ id: media.id });
-
+    quotaTracker.used += sizeInMB;
     await db.update(users)
         .set({ storageUsed: sql`${users.storageUsed} + ${sizeInMB}` })
         .where(eq(users.id, userId));
