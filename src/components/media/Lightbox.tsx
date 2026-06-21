@@ -1,9 +1,9 @@
 "use client";
 
-import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Tag, Loader2, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon, Edit2 } from "lucide-react";
+import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Tag, Loader2, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon, Edit2, Video, Type, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { useTransition, useState, useEffect } from "react";
-import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction, getTags, addTags, removeTag } from "@/server/actions/media-mutations";
+import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction, getTags, addTags, removeTag, updateMediaMetadata } from "@/server/actions/media-mutations";
 import { updateAlbumAction } from "@/server/actions/album-actions";
 import { moveToLockedFolder } from "@/server/actions/locked-actions";
 import { restoreFromLockedFolder } from "@/server/actions/locked-actions";
@@ -293,12 +293,61 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                         </button>
                     </div>
                     <div className="space-y-8">
-                        <DetailSection icon={<Calendar className="w-5 h-5" />} label="Date Taken" value={item.dateTaken ? format(new Date(item.dateTaken), "PPP p") : "Unknown"} />
+                        <EditDetailSection
+                            icon={<Type className="w-5 h-5" />}
+                            label="Caption"
+                            displayValue={item.caption}
+                            initialEditValue={item.caption || ""}
+                            onSave={async (val: string) => {
+                                await updateMediaMetadata(item.id, { caption: val });
+                                router.refresh();
+                            }}
+                        />
+                        <EditDetailSection icon={<Calendar className="w-5 h-5" />} label="Date Taken" displayValue={item.dateTaken ? format(new Date(item.dateTaken), "PPP p") : "Unknown"} initialEditValue={item.dateTaken ? new Date(item.dateTaken).toISOString().slice(0, 16) : ""} 
+                            type="datetime-local" onSave={async (val: string) => {
+                                if (!val) return;
+                                await updateMediaMetadata(item.id, { dateTaken: new Date(val) });
+                                router.refresh();
+                            }}  
+                        />
                         {item.cameraModel && (
-                            <DetailSection icon={<Camera className="w-5 h-5" />} label="Camera" value={item.cameraModel} />
+                            <DetailSection icon={<Camera className="w-5 h-5" />} label="Camera" value={item.cameraModel} sub={item.lensModel} />
+                        )}
+                        {(item.focalLength || item.fNumber || item.iso || item.exposureTime) && (
+                            <DetailSection
+                                icon={<Camera className="w-5 h-5" />}
+                                value={[
+                                    item.focalLength ? `${item.focalLength}mm` : '',
+                                    item.fNumber ? `f/${item.fNumber}` : '',
+                                    item.iso ? `ISO ${item.iso}` : '',
+                                    item.exposureTime ? (item.exposureTime < 1 ? `1/${Math.round(1/item.exposureTime)}s` : `${item.exposureTime}s`) : ''
+                                ].filter(Boolean).join(' • ')}
+                            />
+                        )}
+
+                        {item.fps && (
+                            <DetailSection icon={<Video className="w-5 h-5" />} value={`${item.fps.toFixed(2)} FPS`} />
                         )}
                         {item.gpsLat && (
-                            <DetailSection icon={<MapPin className="w-5 h-5" />} label="Location" value={`${item.gpsLat.toFixed(4)}, ${item.gpsLng.toFixed(4)}`} />
+                            <EditDetailSection 
+                                icon={<MapPin className="w-5 h-5" />}
+                                label="Location"
+                                displayValue={item.locationCity || (item.gpsLat ? `${item.gpsLat.toFixed(4)}, ${item.gpsLng.toFixed(4)}` : "")}
+                                initialEditValue={item.locationCity || (item.gpsLat ? `${item.gpsLat.toFixed(4)}, ${item.gpsLng.toFixed(4)}`: "")}
+                                onSave={async (val: string) => {
+                                    if (!val.trim()) return;
+                                    const coords = val.split(',')
+                                    if (coords.length === 2 && !isNaN(Number(coords[0])) && !isNaN(Number(coords[1]))) {
+                                        await updateMediaMetadata(item.id, {
+                                            gpsLat: Number(coords[0].trim()),
+                                            gpsLng: Number(coords[1].trim())
+                                        });
+                                    } else {
+                                        await updateMediaMetadata(item.id, { locationCity: val });
+                                    }
+                                    router.refresh();
+                                }}
+                            />
                         )}
                         <DetailSection icon={<FileText className="w-5 h-5" />} label="File Details" value={item.filename} sub={`${(item.size / 1024 / 1024).toFixed(2)} MB • ${item.width} x ${item.height}`} />
                         <div className="pt-6 border-t border-border">
@@ -359,6 +408,50 @@ function DetailSection({ icon, label, value, sub }: any) {
                 <p className="text-[10px] text-muted uppercase font-bold tracking-widest mb-1">{label}</p>
                 <p className="text-sm text-foreground leading-snug">{value}</p>
                 {sub && <p className="text-[10px] text-muted mt-1.5">{sub}</p>}
+            </div>
+        </div>
+    );
+}
+
+function EditDetailSection({ icon, label, displayValue, initialEditValue, onSave, type = "text" }: any) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editValue, setEditValue] = useState(initialEditValue || "");
+
+    const handleSave = () => {
+        onSave(editValue);
+        setIsEditing(false);
+    };
+
+    return (
+        <div className="flex gap-4 group">
+            <div className="mt-1 text-muted shrink-0">{icon}</div>
+            <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start">
+                    <p className="text-[10px] text-muted uppercase font-bold tracking-widest mb-1">{label}</p>
+                    {!isEditing && (
+                        <button onClick={() => setIsEditing(true)} className="opacity-0 group-hover:opacity-100 text-muted hover:text-foreground transition-opactiy p-1">
+                            <Edit2 size={12} />
+                        </button>
+                    )}
+                </div>
+                {isEditing ? (
+                    <div className="flex flex-col gap-2 mt-1">
+                        <input
+                            type={type}
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="bg-background border border-border rounded px-2 py-1.5 text-sm text-foreground w-full focus:outline-none focus:border-orange-500" 
+                            autoFocus />
+                        <div className="flex gap-3">
+                            <button onClick={handleSave} className="text-orange-500 hover:text-orange-400 text-xs font-bold transition-colors">Save</button>
+                            <button onClick={() => { setIsEditing(false); setEditValue(initialEditValue || ""); }} className="text-muted hover:text-foreground text-xs transition-colors">Cancel</button>
+                        </div>
+                    </div>
+                ) : (
+                    <p className={`text-sm leading-snug break-words ${displayValue ? "text-foreground" : "text-muted italic"}`}>
+                        {displayValue || `Add ${label}`}
+                    </p>
+                )}
             </div>
         </div>
     );

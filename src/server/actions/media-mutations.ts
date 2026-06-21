@@ -370,3 +370,42 @@ export async function bulkAddTags(mediaIds: string[], tagNames: string[]) {
     return { success: false, error: "failed to apply bulk tags" };
   }
 }
+
+export async function updateMediaMetadata(
+  mediaId: string,
+  data: {
+    dateTaken?: Date;
+    gpsLat?: number | null;
+    gpsLng?: number | null;
+    locationCity?: string | null;
+    locationState?: string | null;
+    locationCountry?: string | null;
+    caption?: string | null;
+  }
+) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const updateData: any = {};
+  if (data.dateTaken !== undefined) updateData.dateTaken = data.dateTaken;
+  if (data.gpsLat !== undefined) updateData.gpsLat = data.gpsLat;
+  if (data.gpsLng !== undefined) updateData.gpsLng = data.gpsLng;
+  if (data.locationCity !== undefined) updateData.locationCity = data.locationCity;
+  if (data.locationState !== undefined) updateData.locationState = data.locationState;
+  if (data.locationCountry !== undefined) updateData.locationCountry = data.locationCountry;
+  if (data.caption !== undefined) updateData.caption = data.caption;
+  if (Object.keys(updateData).length === 0) return { success: true };
+  
+  try {
+    await db
+      .update(media)
+      .set(updateData)
+      .where(and(eq(media.id, mediaId), eq(media.ownerId, session.user.id)));
+    await cacheInvalid.onMediaChanged(session.user.id, mediaId, data.gpsLat !== undefined);
+    revalidatePath("/photos");
+    revalidatePath("/albums", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to update media metadata", err);
+    return { success: false, error: "Failed to update metadata" };
+  }
+}

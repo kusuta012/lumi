@@ -103,6 +103,11 @@ export const media = pgTable('media', {
     dateTaken: timestamp('date_taken'),
     cameraModel: text('camera_model'), // idk if this should be here
     lensModel: text('lens_model'), // idk if this should be here
+    focalLength: real('focal_length'),
+    fNumber: real('f_number'),
+    iso: integer('iso'),
+    exposureTime: real('exposure_time'),
+    fps: real('fps'),
     gpsLat: real('gps_lat'),
     gpsLng: real('gps_lng'),
     locationCity: text('location_city'),

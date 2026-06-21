@@ -142,6 +142,12 @@ export async function processMediaItem(mediaId: string) {
     let locationCity: string | null = null;
     let locationState: string | null = null;
     let locationCountry: string | null = null;
+    let lensModel: string | null = null;
+    let focalLength: number | null = null;
+    let fNumber: number | null = null;
+    let iso: number | null = null;
+    let exposureTime: number | null = null;
+    let fps: number | null = null;
 
     if (isVideo) {
       const stats = await fs.stat(localInput);
@@ -153,7 +159,7 @@ export async function processMediaItem(mediaId: string) {
         "-v",
         "error",
         "-show_entries",
-        "stream=width,height,codec_type,codec_name:format=duration",
+        "stream=width,height,codec_type,codec_name,r_frame_rate:format=duration",
         "-of",
         "json",
         localInput,
@@ -168,6 +174,14 @@ export async function processMediaItem(mediaId: string) {
       width = Number(videoStream.width) || 0;
       height = Number(videoStream.height) || 0;
       duration = metadata.format.duration ? parseFloat(metadata.format.duration) : 0;
+
+      if (videoStream.r_frame_rate) {
+        const [num, den] = videoStream.r_frame_rate.split('/');
+        if (num && den && Number(den) !== 0) {
+          fps = Number(num) / Number(den);
+        }
+      }
+
     } else {
       const imageBuffer = await fs.readFile(localInput);
       try {
@@ -192,6 +206,11 @@ export async function processMediaItem(mediaId: string) {
                     if (imageData?.Model) {
                     cameraModel = String(imageData.Model);
                     }
+                    if (photoData?.lensModel) lensModel = String(photoData.LensModel);
+                    if (photoData?.FocalLength) focalLength = Number(photoData.FocalLength);
+                    if (photoData?.FNumber) fNumber = Number(photoData.fNumber);
+                    if (photoData?.ISOSpeedRatings) iso = Number(photoData.ISOSpeedRatings);
+                    if (photoData?.ExposureTime) exposureTime = Number(photoData.ExposureTime); 
                     const gpsData = exif.GPSInfo || exif.GPS || exif.gps;
                     if (gpsData) {
                       const lat = dmsToDecimal(gpsData.GPSLatitude, gpsData.GPSLatitudeRef);
@@ -236,6 +255,12 @@ export async function processMediaItem(mediaId: string) {
               duration,
               dateTaken: dateTaken || item.createdAt,
               cameraModel,
+              lensModel,
+              focalLength,
+              fNumber,
+              iso,
+              exposureTime,
+              fps,
               gpsLat,
               gpsLng,
               hash: fileHash,
