@@ -1,6 +1,6 @@
 import { db } from "@/db"
 import { media } from "@/db/schema"
-import {eq, desc, and, isNotNull } from "drizzle-orm";
+import {eq, desc, and, sql } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import TimelineGallery from "@/components/media/TimelineGallery";
 import { redisCache } from "@/lib/cache";
@@ -19,7 +19,7 @@ export default async function PhotosPage() {
                 eq(media.isArchived, false),
                 eq(media.isLocked, false)
             ),
-            orderBy: [desc(media.dateTaken), desc(media.createdAt)],
+            orderBy: [sql`COALESCE(${media.dateTaken}, ${media.createdAt}) DESC`, desc(media.id )],
             limit: 50,
         });
         await redisCache.set(cacheKey, userMedia, 3600);

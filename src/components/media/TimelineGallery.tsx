@@ -57,8 +57,11 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
     const isSelectionMode = selectedIds.length > 0;
     const [mediaItems, setMediaItems] = useState<MediaItem[]>(initialMedia);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
-    const [cursor, setCursor] = useState<string | null>(
-        initialMedia.length === 50 && !isSearchPage ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null
+    const [cursor, setCursor] = useState<{ts: string, id: string} | null>(
+        initialMedia.length === 50 && !isSearchPage ? {
+            ts: new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString(),
+            id: initialMedia[initialMedia.length - 1].id
+        } : null
     )
     const [hasMore, setHasMore] = useState(initialMedia.length >= 50);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -89,7 +92,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         if (isLoadingMore || !hasMore || isTrashPage || isLockedPage || isSearchPage || albumId || !cursor) return;
         setIsLoadingMore(true);
         try {
-            const res = await fetch(`/api/photos/timeline?cursor=${cursor}`);
+            const res = await fetch(`/api/photos/timeline?cursor=${cursor.ts}&cursorId=${cursor.id}`);
             if (res.ok) {
                 const json = await res.json();
                 const newPhotos = json.data.map((m: any) => ({
@@ -99,7 +102,10 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                 }));
 
                 setMediaItems(prev => [...prev, ...newPhotos]);
-                setCursor(json.nextCursor);
+                setCursor({
+                    ts: json.nextCursorTs,
+                    id: json.nextCursorId
+                });
             } else {
                 console.error("internal server error, pagination failed");
                 setHasMore(false);
@@ -131,7 +137,9 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
 
     useEffect(() => {
         setMediaItems(initialMedia);
-        setCursor(initialMedia.length >= 50 && !isSearchPage ? new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString() : null);
+        setCursor(initialMedia.length >= 50 && !isSearchPage ? {
+            ts: new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString(),
+            id: initialMedia[initialMedia.length - 1].id } : null);
         setHasMore(initialMedia.length >= 50 && !isSearchPage);
     }, [initialMedia, isSearchPage]);
 

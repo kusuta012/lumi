@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     const limit = 50;
 
     try {
+        const cursorId = searchParams.get("cursorId");
         let baseCondition = and(
             eq(media.ownerId, session.user.id),
             eq(media.isDeleted, false),
@@ -21,28 +22,33 @@ export async function GET(req: NextRequest) {
         );
 
         if (cursor && cursor !== "null") {
-            const cursorDate = new Date(cursor);
             baseCondition = and(
                 baseCondition,
-                sql`COALESCE(${media.dateTaken}, ${media.createdAt}) < ${cursor}::timestamp`
+                sql`(COALESCE(${media.dateTaken}, ${media.createdAt}), ${media.id}) < (${cursor}::timestamp, ${cursorId}::uuid)`
             );
         }
 
         const photos = await db.query.media.findMany({
             where: baseCondition,
-            orderBy: [desc(media.dateTaken), desc(media.createdAt)],
+            orderBy: [
+                sql`COALESCE(${media.dateTaken}, ${media.createdAt}) DESC`,
+                desc(media.id)
+            ],
             limit: limit,
         });
 
-        let nextCursor = null;
+        let nextCursorTs = null;
+        let nextCursorId = null;
         if (photos.length === limit) {
             const lastPhoto = photos[photos.length - 1];
-            nextCursor = new Date(lastPhoto.dateTaken || lastPhoto.createdAt).toISOString();
+            nextCursorTs = new Date(lastPhoto.dateTaken || lastPhoto.createdAt).toISOString();
+            nextCursorId = lastPhoto.id;
         }
 
         return NextResponse.json({
             data: photos,
-            nextCursor: nextCursor
+            nextCursorTs,
+            nextCursorId
         });
     } catch (err) {
         return new NextResponse("failed to fetch timeline", { status: 500 });
