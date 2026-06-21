@@ -57,6 +57,19 @@ export async function GET(
         if (hlsFile) {
             objectKey = `hls/${item.ownerId}/${item.id}/${hlsFile}`;
             contentType = hlsFile.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp2t";
+            if (hlsFile.endsWith(".m3u8")) {
+                const stream = await client.getObject(bucket, objectKey);
+                const chunks: Buffer[] = [];
+                for await (const chunk of stream) chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+                let playlist = Buffer.concat(chunks).toString("utf-8");
+                playlist = playlist.replace(/(segment_\d+\.ts)/g, `/api/media/${id}?hls=$1`);
+                return new NextResponse(playlist, {
+                    headers: {
+                        "Content-Type": "application/vnd.apple.mpegurl",
+                        "Cache-Control": "public, max-age=300, immutable",
+                    },
+                });
+            }
         }
 
         else if (size === "sprite") {

@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import ShareModal from "./ShareModal";
 import { useNotification } from "../providers/NotificationProvider";
 import TagModal from "./TagModal";
+import HLSPlayer from "./HLSPlayer";
 
 
 interface LightboxProps {
@@ -267,7 +268,7 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                     )}
                     
                     {item.mimetype.startsWith("video/") ? (
-                        <video key={item.id} src={`/api/media/${item.id}?size=original`} controls autoPlay className="max-w-full max-h-full outline-none shadow-2xl" />
+                        <HLSPlayer key={item.id} mediaId={item.id} hlsPlaylistKey={item.hlsPlaylistKey} fallbackSrc={`/api/media/${item.id}?size=original`} />
                     ) : (
                         <img 
                         key={item.id} 
