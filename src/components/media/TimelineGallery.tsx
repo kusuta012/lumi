@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useCallback, useRef, useMemo} from "react";
 import Lightbox from "./Lightbox";
-import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw } from "lucide-react";
+import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw, Download } from "lucide-react";
 import AddToAlbumModal from "./AddToAlbumModal";
 import { restoreMediaAction, deletePermanentlyAction, bulkMoveToTrashAction } from "@/server/actions/media-mutations";
 import ShareModal from "./ShareModal";
@@ -244,6 +244,28 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         });
     };
 
+    const handleBulkDownload = () => {
+        startTransition(async () => {
+            try {
+                const res = await fetch("/api/download/batch", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids: selectedIds }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    window.location.href = data.url;
+                    clearSelection();
+                } else {
+                    notify("error", "Error", "Failed to prepare download");
+                }
+            } catch (err) {
+                notify("error", "Error", "Failed to initiate download");
+            }
+        })
+    };
+
     return(
         <div className="p-6 pb-24 relative" ref={listRef}>
             {isSelectionMode && (
@@ -266,11 +288,14 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                             </>
                         ) : (
                             <>
-                            <button onClick={() => setShowAlbumModal(true)} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-orange-500 transition-colors">
+                            <button onClick={() => setShowAlbumModal(true)} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors">
                             <Plus size={18} />
                         </button>
                         <button onClick={() => setShowShareModal(true)} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors">
                             <Share2 size={18} />
+                        </button>
+                        <button onClick={handleBulkDownload} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors">
+                            <Download size={18} />
                         </button>
                         <button onClick={handleBulkTrash} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors">
                             <Trash2 size={18} />
