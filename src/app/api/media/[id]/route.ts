@@ -15,6 +15,7 @@ export async function GET(
 
     const { id } = await params;
     const { searchParams } = new URL(req.url);
+    const isDownload = searchParams.get("download") === "true";
     const size = searchParams.get("size") || "original";
     const hlsFile = searchParams.get("hls");
 
@@ -109,12 +110,15 @@ export async function GET(
 
         try {
            const dataStream = await client.getObject(bucket, objectKey);
-            return new NextResponse(dataStream as any, {
-                headers: {
-                    "Content-Type": size === "original" ? item.mimetype : "image/webp",
-                    "Cache-Control": "public, max-age=31536000, immutable",
-                },
-            }); 
+           const headers: any = {
+                "Content-Type": size === "original" ? item.mimetype : "image/webp",
+                "Cache-Control": "public, max-age=31536000, immutable",
+            };
+
+            if (isDownload) {
+                headers["Content-Dispositon"] = `attachment; filename="${item.filename}"`;
+            }
+                return new NextResponse(dataStream as any, { headers }); 
         } catch (err: any) {
             if (err.code === 'NoSuchKey' && size !== "original" && !hlsFile) {
                 if (item.mimetype.startsWith("video/")) {

@@ -98,13 +98,12 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
     }
 
     const handleDownload = async () => {
-        const res = await fetch(`/api/media/${item.id}?size=original`);
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
+        a.href = `/api/media/${item.id}?size=original&download=true`;
         a.download = item.filename;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
     };
 
     const handleCopy = async () => {
