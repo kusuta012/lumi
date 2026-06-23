@@ -11,9 +11,9 @@ import { systemQueue } from "@/lib/queue";
 import { SystemBackupJob } from "@/server/services/system-backup";
 import { aestheticBackfill } from "@/server/services/backfill";
 import { faceClustering } from "@/server/services/face-cluster";
-import { faceClusterQueue } from "@/lib/queue";
 import { GTakeoutImport } from "@/server/services/takeout-importer";
 import { sysCleanupQueue } from "@/lib/queue";
+import { cleanExpShareLinks } from "@/server/actions/share-actions";
 import fs from "fs/promises";
 import os from "os";
 
@@ -88,6 +88,9 @@ const sysCleanupWorker = new Worker(
                 }
             }
         }
+
+        await cleanExpShareLinks();
+        await cleanExpiredTrash();
     },
     { connection, concurrency: 1 }
 );
@@ -126,8 +129,3 @@ sysCleanupQueue.add('daily-cleanup', {}, {
     repeat: { pattern: '0 4 * * *' },
     jobId: 'daily-tmp-cleanup'
 });
-
-cleanExpiredTrash();
-setInterval(() => {
-    cleanExpiredTrash();
-}, 86400000);

@@ -6,7 +6,7 @@ import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { addMediaToPipe } from "@/lib/queue";
-import { eq, sql, and, ilike, not, or, notInArray } from "drizzle-orm";
+import { eq, sql, and, ilike, not, or, notInArray, lt } from "drizzle-orm";
 import { broadcastAlbumUpdate } from "@/lib/pubsub";
 import { getAlbumRole, hasPermission } from "../services/rbac";
 import { cacheInvalid } from "@/lib/cache";
@@ -255,3 +255,11 @@ export async function getAlbumContributors(albumId: string) {
     }
 }
 
+export async function cleanExpShareLinks() {
+    try {
+        await db.delete(shareLinks)
+            .where(lt(shareLinks.expiresAt, new Date()));
+    } catch (err) {
+        console.error("Failed to clean expired share links", err);
+    }
+}
