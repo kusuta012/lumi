@@ -55,7 +55,8 @@ export async function getTopPeople(userId: string): Promise<TopPerson[]> {
 }
 
 export async function getRcntHighlights(userId: string): Promise<HighlightItem[]> {
-    const cacheKey = `user_explore_highlight:${userId}`;
+    const today = new Date().toISOString().split("T")[0];
+    const cacheKey = `user_explore_highlight:${userId}:${today}`;
     const cachedData = await redisCache.get(cacheKey);
 
     if (cachedData) {
@@ -79,7 +80,7 @@ export async function getRcntHighlights(userId: string): Promise<HighlightItem[]
             gt(media.createdAt, thirtyDaysAgooo)
         ),
         orderBy: [desc(media.aestheticScore)],
-        limit: 20
+        limit: 40
     });
 
     if (results.length < 5) {
@@ -92,9 +93,16 @@ export async function getRcntHighlights(userId: string): Promise<HighlightItem[]
                 gt(media.createdAt, thirtyDaysAgooo)
             ),
             orderBy: [desc(media.blurScore)],
-            limit: 20
+            limit: 40
         })
     }
+
+    for (let i = results.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [results[i], results[j]] = [results[j], results[i]];
+    }
+
+    const picked = results.slice(0, 20);
 
     const serializable = results.map(r => ({
         id: r.id,
@@ -108,8 +116,14 @@ export async function getRcntHighlights(userId: string): Promise<HighlightItem[]
         blurScore: r.blurScore,
         aestheticScore: r.aestheticScore
     }));
-    await redisCache.set(cacheKey, serializable, 3600);
-    return results as unknown as HighlightItem[];
+
+    const now = new Date();
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0);
+    const secsUntilMidnight = Math.floor((midnight.getTime() - now.getTime()) / 1000);
+
+    await redisCache.set(cacheKey, serializable, secsUntilMidnight);
+    return picked as unknown as HighlightItem[];
 }
 
 export async function getTopPlaces(userId: string): Promise<PlaceHighlight[]> {
@@ -137,4 +151,28 @@ export async function getTopPlaces(userId: string): Promise<PlaceHighlight[]> {
     const places = (result as any) as PlaceHighlight[];
     await redisCache.set(cacheKey, places, 3600);
     return places;
+}
+
+export async function getMemories(userId: string): Promise<HighlightItem[]> {
+    const today = new Date();
+    const todayMonth = today.getMonth() + 1;
+    const todayDay = today.getDate();
+    const results = await db.execute(sql`
+       SELECT id, filename, mimetype, size, width, height,
+            created_at as "createdAt", date_taken as "dateTaken",
+            blur_score as "blurScore", aesthetic_score as "aestheticScore"
+       FROM media
+       WHERE owner_id = ${userId}::uuid
+         AND is_deleted = false
+         AND is_locked = false
+         AND date_taken IS NOT NULL
+         AND EXTRACT(MONTH FROM date_taken) = ${todayMonth}
+         AND EXTRACT(DAY FROM date_taken) = ${todayDay}
+         AND EXTRACT(YEAR FROM date_taken) < ${today.getFullYear()}
+         AND (aesthetic_score > 40 OR blur_score > 60)
+       ORDER BY aesthetic_score DESC NULLS LAST, blur_score DESC NULLS LAST
+       LIMIT 20 
+    `);
+
+    return (results as any[]) as HighlightItem[];
 }
