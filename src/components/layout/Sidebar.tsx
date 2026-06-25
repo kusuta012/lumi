@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {
-    Image as ImageIcon, Search, Map, Users, Heart, Library, Archive, Lock, Trash2, Info, Hammer, Settings
+    Image as ImageIcon, Search, Map, Users, Heart, Library, Archive, Lock, Trash2, Info, Hammer
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -27,7 +27,6 @@ export default function Sidebar({ userRole, storageUsed = 0, storageQuota = 5120
         { icon: Archive, label: "Archive", href: "/archives" },
         { icon: Lock, label: "Locked Folder", href: "/locked" },
         { icon: Trash2, label: "Trash", href: "/trash" },
-        { icon: Settings, label: "Settings", href: "/settings"},
     ];
     const isActive = (path: string) => pathname === path;
     const percentUsed = Math.min(100, (storageUsed / storageQuota) * 100);
