@@ -1,8 +1,8 @@
 "use client";
 
-import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Tag, Loader2, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon, Edit2, Video, Type, Edit } from "lucide-react";
+import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Tag, Loader2, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon, Edit2, Video, Type, Edit, Play, Pause } from "lucide-react";
 import { format } from "date-fns";
-import { useTransition, useState, useEffect } from "react";
+import { useTransition, useState, useEffect, useRef, useCallback } from "react";
 import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction, getTags, addTags, removeTag, updateMediaMetadata } from "@/server/actions/media-mutations";
 import { updateAlbumAction } from "@/server/actions/album-actions";
 import { moveToLockedFolder } from "@/server/actions/locked-actions";
@@ -37,6 +37,9 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
     const [tagsList, setTagsList] = useState<{ id: string; name: string }[]>([]);
     const [newTagName, setNewTagName] = useState("");
     const [isLoadingTags, setLoadingTags] = useState(false);
+    const [slideshowActive, setSlideshowActive] = useState(false);
+    const [slideshowSpeed, setSlideshowSpeed] = useState(5);
+    const slideshowTimer = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (!item) {
@@ -58,6 +61,31 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
         });
     }, [item?.id, showInfo]);
 
+    useEffect(() => {
+        if (slideshowTimer.current) {
+            clearTimeout(slideshowTimer.current);
+            slideshowTimer.current = null;
+        }
+
+        if (!slideshowActive) return;
+        const isVideo = item?.mimetype?.startsWith("video/");
+        if (isVideo) return;
+
+        slideshowTimer.current = setTimeout(() => {
+            if (index < items.length - 1) {
+                setIndex(index + 1);
+            } else {
+                setSlideshowActive(false);
+            }
+        }, slideshowSpeed * 1000);
+
+        return () => {
+            if (slideshowTimer.current) {
+                clearTimeout(slideshowTimer.current);
+            }
+        };
+    }, [slideshowActive, slideshowSpeed, index, item, items.length, setIndex]);
+
     const goNext = () => index < items.length - 1 && setIndex(index + 1);
     const goPrev = () => index > 0 && setIndex(index - 1);
 
@@ -65,11 +93,21 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "ArrowRight") goNext();
             if (e.key === "ArrowLeft") goPrev();
-            if (e.key === "Escape") onClose();
+            if (e.key === "Escape") {
+                if (slideshowActive) {
+                    setSlideshowActive(false);
+                } else {
+                    onClose();
+                }
+            }
+            if (e.key === " ") {
+                e.preventDefault();
+                setSlideshowActive(prev => !prev);
+            }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [index, items.length]);
+    }, [index, items.length, slideshowActive]);
 
     const handleAction = (type: 'fav' | 'archive' | 'trash') => {
         startTransition(async () => {
@@ -215,7 +253,7 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                     </button>
 
                     <div className="flex items-center gap-1 sm:gap-2">
-                        
+                        <IconButton icon={slideshowActive ? <Pause size={20} /> : <Play size={20} />} onClick={() => setSlideshowActive(!slideshowActive)} active={slideshowActive} />
                         <IconButton icon={<Maximize2 size={20} />} onClick={() => document.documentElement.requestFullscreen()} />
                         <IconButton icon={<Copy size={20} />} onClick={handleCopy} />
                         {allowDownload && (
@@ -283,6 +321,25 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                         </button>
                     )}
                 </div>
+                {slideshowActive && (
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4 px-5 py-2.5 bg-surface/90 backdrop-blur-xl border border-border rounded-full shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                <button onClick={() => setSlideshowActive(false)} className="p-1.5 rounded-full hover:bg-surface-hover transition-colors text-foreground">
+                                    <Pause size={16} />
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    {[3, 5, 8].map(s => (
+                                        <button key={s} onClick={() => setSlideshowSpeed(s)} className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                                            slideshowSpeed === s ? 'bg-orange-500 text-white' : 'text-muted hover:text-foreground hover:bg-surface-hover'
+                                        }`}>
+                                            {s}s
+                                        </button>
+                                    ))}
+                                </div>
+                                <span className="text-[11px] text-muted font-medium">
+                                    {index + 1} / {items.length}
+                                </span>
+                            </div>
+                        )}
             </div>
             {showInfo && (
                 <div className="w-80 bg-surface border-l border-border p-6 flex flex-col h-full animate-in slide-in-from-right duration-300 z-30 overflow-y-auto">
