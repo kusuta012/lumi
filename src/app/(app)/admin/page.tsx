@@ -3,12 +3,13 @@ import { users, media } from "@/db/schema";
 import { count, sum, sql } from "drizzle-orm";
 import { minioClient, BUCKET_NAME } from "@/lib/storage";
 import RegistrationToggle from "@/components/admin/RegistrationToggle";
-import { getRegistrationSetting } from "@/server/actions/config-actions";
+import { getRegistrationSetting, getVidTranscodeSettings } from "@/server/actions/config-actions";
 import Link from "next/link";
 import os from "os";
 import { getMaintenanceSetting } from "@/server/actions/storage-actions";
 import MaintenanceToggle from "@/components/admin/MaintenanceToggle";
 import { cacheRedis } from "@/lib/cache";
+import VideoTranscode from "@/components/admin/VideoTranscode";
 
 async function checkDatabase() {
     try {
@@ -51,6 +52,7 @@ function getRamUsage() {
 export default async function AdminPage() {
     const allowReg = await getRegistrationSetting();
     const isMaintenance = await getMaintenanceSetting();
+    const transcodeSettings = await getVidTranscodeSettings();
     const ram = getRamUsage();
 
     const [userCountResult] = await db.select({ value: count() }).from(users);
@@ -119,6 +121,7 @@ export default async function AdminPage() {
                             <RegistrationToggle isEnabled={allowReg} />
                             <MaintenanceToggle isEnabled={isMaintenance} />
                         </div>
+                        <VideoTranscode currentSettings={transcodeSettings} />
                     </div>
                 </div>
             </div>

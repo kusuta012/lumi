@@ -6,7 +6,7 @@ import { path as ffprobePath } from "ffprobe-static";
 import exifReader from "exif-reader";
 import { BUCKET_NAME, getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
-import { faces, media, mediaTags, tags, users, people } from "@/db/schema";
+import { faces, media, mediaTags, tags, users, people, platformConfig } from "@/db/schema";
 import { eq, sql, and, ne, inArray } from "drizzle-orm";
 import fs from "fs/promises";
 import { createReadStream, createWriteStream} from "fs";
@@ -301,6 +301,13 @@ export async function processMediaItem(mediaId: string) {
       let hoverSpriteKey: string | null = null;
       let hlsPlaylistKey: string | null = null;
 
+      const transcodeConfigRaw = await db.query.platformConfig.findFirst({
+        where: eq(platformConfig.key, 'video_transcoding')
+      });
+      const transcodeRules = transcodeConfigRaw?.value as any || {
+        enableHevc: true, enableLarge: true, largeThresholdMB: 50, enableLong: true, longThresholdSec: 60
+      };
+
       if (isVideo) {
         const { stdout: frameBuffer } = await execa(
           ffmpegPath,
@@ -349,9 +356,9 @@ export async function processMediaItem(mediaId: string) {
           localInput,
         ]);
         const codec = JSON.parse(probeData)?.streams?.[0]?.codec_name || "";
-        const isHevc = codec === "hevc" || codec === "h265" || codec === "prores";
-        const isLarge = item.size > 50 * 1024 * 1024;
-        const isLong = (item.duration ?? 0) > 60;
+        const isHevc = transcodeRules.enableHevc && (codec === "hevc" || codec === "h265" || codec === "prores");
+        const isLarge = transcodeRules.enableLarge && (item.size > 50 * 1024 * 1024);
+        const isLong = transcodeRules.enableLong && ((item.duration ?? 0) > transcodeRules.longThresholdSec);
 
         if (isHevc || isLarge || isLong) {
           await fs.mkdir(tempHlsDir, { recursive: true });
