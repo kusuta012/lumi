@@ -93,7 +93,7 @@ async def analyze_image(file: UploadFile = File(...)):
             detected_faces = face_analysis.get(cv_image)
 
             for face in detected_faces:
-                if face.det_score > 0.70:
+                if face.det_score > 0.85:
                     x1, y1, x2, y2 = face.bbox
                     embedding = face.normed_embedding if hasattr(face, "normed_embedding") else face.embedding
 

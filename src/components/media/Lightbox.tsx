@@ -1,12 +1,14 @@
 "use client";
 
-import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Tag, Loader2, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon, Edit2, Video, Type, Edit, Play, Pause } from "lucide-react";
-import { format } from "date-fns";
+import { X, ImageIcon, Calendar, Camera, MapPin, FileText, Heart, Tag, Loader2, Trash2, Info, Lock, Unlock, ChevronLeft, ChevronRight, Download, Copy, Maximize2, Share2, SlidersHorizontal, MoreVertical, RefreshCcw, Archive, Icon, Edit2, Video, Type, Edit, Play, Pause, Users } from "lucide-react";
+import { format, set } from "date-fns";
 import { useTransition, useState, useEffect, useRef, useCallback } from "react";
 import { toggleFavoriteAction, toggleArchiveAction, toggleTrashAction, restoreMediaAction, deletePermanentlyAction, getTags, addTags, removeTag, updateMediaMetadata } from "@/server/actions/media-mutations";
 import { updateAlbumAction } from "@/server/actions/album-actions";
 import { moveToLockedFolder } from "@/server/actions/locked-actions";
 import { restoreFromLockedFolder } from "@/server/actions/locked-actions";
+import { getFacesForMedia } from "@/server/actions/people-actions";
+import FaceReassignModal from "./FaceReassignModal";
 import { useRouter } from "next/navigation";
 import ShareModal from "./ShareModal";
 import { useNotification } from "../providers/NotificationProvider";
@@ -40,6 +42,9 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
     const [slideshowActive, setSlideshowActive] = useState(false);
     const [slideshowSpeed, setSlideshowSpeed] = useState(5);
     const slideshowTimer = useRef<NodeJS.Timeout | null>(null);
+    const [faceList, setFacesList] = useState<any[]>([]);
+    const [isLoadingFaces, setLoadingFaces] = useState(false);
+    const [editingFace,  setEditingFace] = useState<any | null>(null);
 
     useEffect(() => {
         if (!item) {
@@ -53,11 +58,18 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
     useEffect(() => {
         if (!showInfo || !item?.id) return;
         setLoadingTags(true);
+        setLoadingFaces(true);
+
         getTags(item.id).then(res => {
             if (res.success && res.tags) {
                 setTagsList(res.tags);
             }
             setLoadingTags(false);
+        });
+
+        getFacesForMedia(item.id).then(res => {
+            if (res.success && res.faces) setFacesList(res.faces);
+            setLoadingFaces(false);
         });
     }, [item?.id, showInfo]);
 
@@ -408,8 +420,27 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
                         )}
                         <DetailSection icon={<FileText className="w-5 h-5" />} label="File Details" value={item.filename} sub={`${(item.size / 1024 / 1024).toFixed(2)} MB • ${item.width} x ${item.height}`} />
                         <div className="pt-6 border-t border-border">
+                            <h3 className="text-xs font-bold text-muted tracking-wider flex items-center gap-2 mb-3">
+                                <Users size={14} />
+                                {isLoadingFaces ? "Loading People..." : faceList.length === 0 ? "No people detected" : `People (${faceList.length})`}
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                {faceList.map(face => (
+                                    <button key={face.id} onClick={() => setEditingFace(face)} className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-hover border border-border hover:border-orange-500/50 transition-colors">
+                                        <div className="w-5 h-5 rounded-full bg-background overflow-hidden flex-shrink-0">
+                                            <img
+                                                src={`/api/media/faces/${face.id}`}
+                                                alt="face"
+                                                className="w-full h-full object-cover" />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-foreground">
+                                            {face.personName || "Unknown Person"}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-xs font-bold text-muted tracking-wider flex items-center gap-2">
+                                <h3 className="text-xs font-bold text-muted tracking-wider flex items-center gap-2 mb-3">
                                     <Tag size={14} />
                                     {tagsList.length === 0 ? "Add tags" : `Tags (${tagsList.length}/5)`}
                                 </h3>
@@ -440,6 +471,9 @@ export default function Lightbox({ items, index, setIndex, onClose, albumId, isO
             )}
 
             <TagModal isOpen={isTagModalOpen} onClose={() => setIsTagModalOpen(false)} tagsList={tagsList} onAddTag={handleAddTag} onRemoveTag={handleRemoveTag} isLoading={isLoadingTags} newTagName={newTagName} setNewTagName={setNewTagName} />
+                {editingFace && (
+                    <FaceReassignModal face={editingFace} onClose={() => setEditingFace(null)} onSuccess={() => {setEditingFace(null); getFacesForMedia(item.id).then(res => { if (res.success && res.faces) setFacesList(res.faces); }); }} />
+                )}
         </div>
     );
 }

@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { people, faces } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ilike } from "drizzle-orm";
 import { auth } from "@/server/auth";
 
 export async function renamePerson(personId: string, name: string) {
@@ -193,4 +193,23 @@ export async function getFacesForMedia(mediaId: string) {
             personName: f.person?.name || null,
         }))
     };
+}
+
+export async function searchPeople(query: string) {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, people: [] };
+
+    try {
+        const results = await db.query.people.findMany({
+            where: and(
+                eq(people.ownerId, session.user.id),
+                ilike(people.name, `%${query}%`)
+            ),
+            limit: 10,
+            columns: { id: true, name: true, coverFaceId: true }
+        });
+        return { success: true, people: results };
+    } catch (err) {
+        return { success: false, people: [] };
+    }
 }

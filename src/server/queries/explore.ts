@@ -41,10 +41,13 @@ export async function getTopPeople(userId: string): Promise<TopPerson[]> {
     const result = await db.execute(sql`
         SELECT p.id, p.name, p.cover_face_id as "coverFaceId", count(f.id)::int as "faceCount"
         FROM ${people} p
-        LEFT JOIN ${faces} f ON f.person_id = p.id
-        WHERE p.owner_id = ${userId}::uuid AND p.is_hidden = false
+        INNER JOIN ${faces} f ON f.person_id = p.id
+        INNER JOIN media m ON f.media_id = m.id
+        WHERE p.owner_id = ${userId}::uuid 
+            AND p.is_hidden = false
+            AND m.is_deleted = false
+            AND m.is_locked = false
         GROUP BY p.id, p.name, p.cover_face_id
-        HAVING count(f.id) > 0
         ORDER BY "faceCount" DESC
         LIMIT 8
         `);

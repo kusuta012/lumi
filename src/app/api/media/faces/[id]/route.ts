@@ -26,13 +26,17 @@ export async function GET(
             return new Response("Face record not found", { status: 404 });
         }
 
+        const smallThumbKey = (face.media.thumbnails as any)?.small;
+        if (!smallThumbKey) return new Response("Thumb not found", { status: 404 });
+
         const { client, bucket } = getStorageClient(face.media.storageBackend?.config);
-        const stream = await client.getObject(bucket, face.media.objectKey);
+        const stream = await client.getObject(bucket, smallThumbKey);
+
         const chunks: Buffer[] = [];
         for await (const chunk of stream) {
             chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
         }
-        const originalBuffer = Buffer.concat(chunks);
+        const buffer = Buffer.concat(chunks);
         const box = face.boundingBox as { x: number; y: number; w: number; h: number };
         const imgWidth = face.media.width || 0;
         const imgHeight = face.media.height || 0;
@@ -49,7 +53,7 @@ export async function GET(
             if (top + height > imgHeight) height = imgHeight - top;
         }
 
-        const faceAvatar = await sharp(originalBuffer)
+        const faceAvatar = await sharp(buffer)
             .extract({ left, top, width, height })
             .resize(200, 200, { fit: "cover" })
             .webp({ quality: 85 })
