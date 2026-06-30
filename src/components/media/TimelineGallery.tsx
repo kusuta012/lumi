@@ -101,11 +101,23 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                     createdAt: new Date(m.createdAt)
                 }));
 
-                setMediaItems(prev => [...prev, ...newPhotos]);
-                setCursor({
-                    ts: json.nextCursorTs,
-                    id: json.nextCursorId
-                });
+                const existingIds = new Set(mediaItems.map(m => m.id));
+                const unique = newPhotos.filter((m: MediaItem) => !existingIds.has(m.id));
+
+                if (unique.length > 0) {
+                    setMediaItems(prev => [...prev, ...newPhotos]);  
+                }
+                
+                if (json.nextCursorTs && json.nextCursorId) {
+                    setCursor({
+                        ts: json.nextCursorTs,
+                        id: json.nextCursorId
+                    });
+                } else {
+                    setCursor(null);
+                    setHasMore(false);
+                }
+                
             } else {
                 console.error("internal server error, pagination failed");
                 setHasMore(false);
@@ -356,7 +368,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
                 </div>
             )}
 
-            {cursor && !isTrashPage && !isLockedPage && !isSearchPage && !albumId && (
+            {hasMore && !isTrashPage && !isLockedPage && !isSearchPage && !albumId && (
                 <div ref={loadMoreRef} className="h-20 w-full flex items-center justify-center mt-8">
                     <span className="text-xs text-muted animate-pulse font-bold tracking-widest">
                         Loading More...
