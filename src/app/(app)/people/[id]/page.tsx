@@ -1,10 +1,11 @@
 import { db } from "@/db";
-import { eq, and, desc, exists } from "drizzle-orm";
+import { eq, and, desc, exists, sql } from "drizzle-orm";
 import { media, faces, people } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { User } from "lucide-react";
 import { redirect } from "next/navigation";
 import TimelineGallery from "@/components/media/TimelineGallery";
+import PersonHeader from "@/components/people/PersonHeader";
 
 export default async function PersonDetail({ params }: { params: Promise<{ id: string }> }) {
     const { id: personId } = await params;
@@ -48,7 +49,10 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                 ))
         )
     ))
-    .orderBy(desc(media.dateTaken), desc(media.createdAt));
+    .orderBy(
+        sql`COALESCE(${media.dateTaken}, ${media.createdAt}) DESC`,
+        desc(media.id)
+    );
 
     const uniqueMedia = dbMedia.filter((value, index, self) =>
         self.findIndex(m => m.id === value.id) === index
@@ -69,16 +73,10 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
 
     return (
         <div>
-            <header className="p-8 pb-0 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky sticky top-0 z-20">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-                        <User className="text-orange-500 w-6 h-6" /> {person.name}
-                    </h1>
-                    <p className="text-muted text-sm mt-2">
-                        Showing {intialMedia.length} {intialMedia.length === 1 ? "photo" : "photos"} containing this face
-                    </p>
-                </div>
-            </header>
+            <PersonHeader
+                person={{ id: person.id, name: person.name, coverFaceId: person.coverFaceId }}
+                photoCount={intialMedia.length}
+            />
             <TimelineGallery initialMedia={intialMedia} startYear={startYear} endYear={endYear} emptyMessage="No photos containing this person yet." />
         </div>
     );

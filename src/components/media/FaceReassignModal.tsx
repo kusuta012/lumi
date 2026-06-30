@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { X, Search, UserMinus, Loader2 } from "lucide-react";
-import { searchPeople, reassignFace, removeFaceFromPerson } from "@/server/actions/people-actions";
+import { X, Search, UserMinus, Loader2, Image } from "lucide-react";
+import { searchPeople, reassignFace, removeFaceFromPerson, setCoverFace } from "@/server/actions/people-actions";
 
 export default function FaceReassignModal({ face, onClose, onSuccess}: { face: any, onClose: () => void, onSuccess: () => void }) {
     const [isPending, startTransition] = useTransition();
@@ -65,6 +65,19 @@ export default function FaceReassignModal({ face, onClose, onSuccess}: { face: a
                     </div>
                 </div>
                 <div className="p-4 bg-background border-t border-border">
+                    <div className="px-4 pb-2">
+                        <button onClick={() => {
+                            startTransition(async () => {
+                                const res = await setCoverFace(face.personId, face.id);
+                                if (res?.success) onSuccess();
+                            });
+                        }}
+                        disabled={isPending}
+                        className="w-full flex justify-center items-center gap-2 py-2 text-sm font-bold text-orange-500 hover:bg-orange/500/10 transition-colors disabled:opacity-50">
+                            {isPending ? <Loader2 size={16} className="animate-spin" /> : <Image size={16} />}
+                            Set as cover photo
+                        </button>
+                    </div>
                     <button onClick={handleRemove} disabled={isPending} className="w-full flex justify-center items-center gap-2 py-2 text-sm font-bold text-red-500 hover:bg-red/500/10 transition-colors disabled:opacity-50">
                         {isPending ? <Loader2 size={16} className="animate-spin" /> : <UserMinus size={16} />}
                         Remove from this photo

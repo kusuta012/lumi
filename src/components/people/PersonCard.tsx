@@ -2,12 +2,12 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import Link from "next/link";
-import { MoreVertical, Edit2, Merge, EyeOff, User } from "lucide-react";
+import { MoreVertical, Edit2, Merge, EyeOff, Eye, User } from "lucide-react";
 import { renamePerson, toggleHidePerson, mergePeople } from "@/server/actions/people-actions";
 import { useRouter } from "next/navigation";
 import { useNotification } from "../providers/NotificationProvider";
 
-export default function PersonCard({ person, allPeople }: { person: any; allPeople: any[] }) {
+export default function PersonCard({ person, allPeople, isHidden = false }: { person: any; allPeople: any[]; isHidden?: boolean }) {
     const router = useRouter();
     const [menuOpen, setMenuOpen] = useState(false);
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
@@ -31,14 +31,16 @@ export default function PersonCard({ person, allPeople }: { person: any; allPeop
         e.stopPropagation();
         setMenuOpen(false);
 
-        if (confirm(`hide "${person.name}" from your library?`)) {
+        const msg = isHidden ? `Unhide "${person.name}"?` : `Hide "${person.name}" from your library?`
+
+        if (confirm(msg)) {
             startTransition(async () => {
-                const res = await toggleHidePerson(person.id, true);
+                const res = await toggleHidePerson(person.id, !isHidden);
                 if (res && res.success) {
-                    notify("success", "Hidden", "Person has been hidden");
+                    notify("success", isHidden ? "Unhidden" : "Hidden" , `Person has been ${isHidden ?"unhidden" : "hidden"}`);
                     router.refresh();
                 } else {
-                    notify("error", "Error", "Failed to hide person");
+                    notify("error", "Error", "Failed to update person");
                 }
             });
         }
@@ -78,7 +80,8 @@ export default function PersonCard({ person, allPeople }: { person: any; allPeop
                         </button>
                         <div className="h-px bg-surface-hover my-1 w-full" />
                         <button onClick={handleHide} disabled={isPending} className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-colors">
-                            <EyeOff size={16} /> Hide Person
+                            {isHidden ? <Eye size={16} /> : <EyeOff size={16} />}
+                            {isHidden ? "Unhide Person" : "Hide Person"}
                         </button>
                     </div>
                 )}

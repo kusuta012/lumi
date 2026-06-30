@@ -4,6 +4,7 @@ import { faces, people } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { Users } from "lucide-react";
 import PersonCard from "@/components/people/PersonCard";
+import HiddenPeople from "@/components/people/HiddenPeople";
 import { redirect } from "next/navigation";
 
 interface PersonRow {
@@ -32,6 +33,18 @@ export default async function PeoplePg() {
 
     const userPeople = (result as any) as PersonRow[];
 
+    const hiddenResult = await db.execute(sql`
+        SELECT p.id, p.name, p.cover_face_id as "coverFaceId", count(f.id)::int as "faceCount"
+        FROM ${people} p
+        LEFT JOIN ${faces} f on f.person_id = p.id
+        WHERE p.owner_id = ${session.user.id}::uuid
+          AND p.is_hidden = true
+        GROUP BY p.id, p.name, p.cover_face_id
+        ORDER BY "faceCount" DESC
+    `);
+
+    const hiddenPeople = (hiddenResult as any) as PersonRow[];
+
     return (
         <div className="p-8">
             <header className="mb-10 flex justify-between items-center">
@@ -55,6 +68,8 @@ export default async function PeoplePg() {
                     ))}
                 </div>
             )}
+
+            <HiddenPeople hiddenPeople={hiddenPeople} allPeople={userPeople} />
         </div>
     );
 }

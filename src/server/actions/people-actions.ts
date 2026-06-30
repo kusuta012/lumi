@@ -213,3 +213,30 @@ export async function searchPeople(query: string) {
         return { success: false, people: [] };
     }
 }
+
+export async function setCoverFace(personId: string, faceId: string) {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { success: false, error: "Unauthorized" };
+    }
+
+    try {
+        const face = await db.query.faces.findFirst({
+            where: eq(faces.id, faceId),
+            with: { person: true }
+        });
+
+        if (!face || face.personId !== personId || face.person?.ownerId !== session.user.id) {
+            return { success: false, error: "Invalid face or person" };
+        }
+
+        await db.update(people)
+            .set({ coverFaceId: faceId })
+            .where(eq(people.id, personId));
+
+        return { success: true };
+    } catch (err) {
+        console.error("Failed to set cover face", err);
+        return { success: false, error: "Failed to set coverr face" };
+    }
+}
