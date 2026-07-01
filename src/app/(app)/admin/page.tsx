@@ -138,6 +138,9 @@ export default async function AdminPage() {
                 <Link href="/admin/audit" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
                     AUDIT LOGS
                 </Link>
+                <Link href="/admin/roles" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
+                    ROLE MANAGEMENT
+                </Link>
             </div>
         </div>
     )

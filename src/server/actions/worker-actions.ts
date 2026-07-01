@@ -1,18 +1,11 @@
 "use server";
 
 import { metadataQueue, thumbnailQueue, aiQueue, migrationQueue, faceClusterQueue } from "@/lib/queue";
-import { auth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
-
-async function ensureSuperAdmin() {
-    const session = await auth();
-    if (session?.user?.roleName !== "Super Admin") {
-        throw new Error("Unauthorized");
-    }
-}
+import { requirePermission } from "@/lib/permissions.server";
 
 export async function getQueueStats() {
-    await ensureSuperAdmin();
+    await requirePermission("can_manage_server")
     try {
         const [metadataCounts, thumbnailCounts, aiCounts, migrationCounts, faceClusterCounts, isMetadataPaused, isThumbnailPaused, isAiPaused, isMigrationPaused, isFaceClusterPaused] = await Promise.all([
             metadataQueue.getJobCounts(),
@@ -69,7 +62,7 @@ export async function getQueueStats() {
 }
 
 export async function manageQueue(queueName: string, action: 'retry' | 'clean' | 'toggle-pause') {
-    await ensureSuperAdmin();
+    await requirePermission("can_manage_server")
 
     let queue;
     if (queueName === "metadata-extraction") {

@@ -1,11 +1,11 @@
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, roles } from "@/db/schema";
 import { auth } from "@/server/auth";
 import { desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import UserManagementTable from "@/components/admin/UserManagementTable";
-import GlobalQuotaManger from "../../../../components/admin/GlobalQuotaManager";
+import GlobalQuotaManger from "@/components/admin/GlobalQuotaManager";
 
 export default async function AdminUsersPage() {
     const session = await auth();
@@ -14,6 +14,10 @@ export default async function AdminUsersPage() {
     const allUsers = await db.query.users.findMany({
         with: { role: true},
         orderBy: [desc(users.createdAt)]
+    });
+
+    const allRoles = await db.query.roles.findMany({
+        orderBy: [desc(roles.createdAt)]
     });
 
     return (
@@ -28,9 +32,9 @@ export default async function AdminUsersPage() {
                 <GlobalQuotaManger />
                 <div className="lg:w-2/3 border border-border bg-background p-4">
                     <h2 className="text-foreground font-bold text-sm mb-4">Current users</h2>
-                    <UserManagementTable users={allUsers} />
+                    <UserManagementTable users={allUsers} roles={allRoles} />
                 </div>
             </div>
         </div>
-    )
+    );
 }

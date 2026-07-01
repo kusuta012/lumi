@@ -2,18 +2,13 @@
 
 import { db } from "@/db";
 import { storageBackends, platformConfig } from "@/db/schema";
-import { auth } from "@/server/auth";
+import { requirePermission } from "@/lib/permissions.server";
 import { eq, count } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { migrationQueue } from "@/lib/queue";
 import { media } from "@/db/schema";
 import { logAuditEvent } from "@/lib/audit";
 
-
-async function ensureSuperAdmin() {
-    const session = await auth();
-    if (session?.user?.roleName !== "Super Admin") throw new Error("Unauthorized");
-}
 
 export async function getMaintenanceSetting() {
     const setting = await db.query.platformConfig.findFirst({
@@ -23,7 +18,7 @@ export async function getMaintenanceSetting() {
 }
 
 export async function toggleMaintenanceMode(currentState: boolean) {
-    await ensureSuperAdmin();
+    await requirePermission("can_manage_server")
     const newValue = !currentState;
     await db.insert(platformConfig)
         .values({ key: 'maintenance_mode', value: newValue })
@@ -33,7 +28,7 @@ export async function toggleMaintenanceMode(currentState: boolean) {
 }
 
 export async function addStorageBackend(data: { name: string, type: string, config: any}) {
-    const admin = await ensureSuperAdmin();
+    const session = await requirePermission("can_manage_server")
     try {
         await db.insert(storageBackends).values({
             name: data.name,
@@ -43,7 +38,7 @@ export async function addStorageBackend(data: { name: string, type: string, conf
             status: 'online'
         });
 
-        await logAuditEvent("storage_added", "system", data.name, { actor: admin.username });
+        await logAuditEvent("storage_added", "system", data.name, { actor: session.user?.name });
         revalidatePath("/admin/storage");
         return { success: true };
     } catch (err) {
@@ -53,7 +48,7 @@ export async function addStorageBackend(data: { name: string, type: string, conf
 }
 
 export async function setDefaultBackend(backendId: string | null) {
-    const admin = await ensureSuperAdmin();
+    const session = await requirePermission("can_manage_server")
     try {
         await db.transaction(async (tx) => {
             await tx.update(storageBackends).set({ isDefault: false });
@@ -62,7 +57,7 @@ export async function setDefaultBackend(backendId: string | null) {
             }
         });
 
-        await logAuditEvent("storage_default_changed", "system", backendId || "ENV_DEFAULT", { actor: admin.username });
+        await logAuditEvent("storage_default_changed", "system", backendId || "ENV_DEFAULT", { actor: session.user?.name });
         revalidatePath("/admin/storage");
         return { success: true };
     } catch (err) {
@@ -72,7 +67,7 @@ export async function setDefaultBackend(backendId: string | null) {
 }
 
 export async function triggerMigration(sourceId: string, targetId: string) {
-    const admin = await ensureSuperAdmin();
+    const session = await requirePermission("can_manage_server")
     try {
         const setting = await db.query.platformConfig.findFirst({ where: eq(platformConfig.key, 'maintenance_mode') });
         if (setting?.value === true) {
@@ -82,7 +77,7 @@ export async function triggerMigration(sourceId: string, targetId: string) {
             .values({ key: 'maintenance_mode', value: true })
             .onConflictDoUpdate({ target: platformConfig.key, set: { value: true } });
         await migrationQueue.add('migrate', { sourceId, targetId });
-        await logAuditEvent("migration_started", "system", `${sourceId}->${targetId}`, { actor: admin.username });
+        await logAuditEvent("migration_started", "system", `${sourceId}->${targetId}`, { actor: session.user?.name });
 
         revalidatePath("/admin/storage");
         revalidatePath("/admin/workers");
@@ -95,7 +90,7 @@ export async function triggerMigration(sourceId: string, targetId: string) {
 }
 
 export async function deleteStorageBackend(backendId: string) {
-    const admin = await ensureSuperAdmin();
+    await requirePermission("can_manage_server")
     
     // try {
     //     const [activeFiles] = await db.select({ value: count() })
@@ -104,13 +99,13 @@ export async function deleteStorageBackend(backendId: string) {
         
     //         if (activeFiles.value > 0) {}
     // }
-    const backend = await db.query.storageBackends.findFirst({ where: eq(storageBackends.id, id) });
+    const backend = await db.query.storageBackends.findFirst({ where: eq(storageBackends.id, backendId) });
     if (backend?.isDefault) {
         return { success: false, error: "cannot delete a default backend, assign a new default first" };
     }
     const [linkedMedia] = await db.select({ value: count() })
         .from(media)
-        .where(eq(media.storageBackendId, id));
+        .where(eq(media.storageBackendId, backendId));
     
     if (linkedMedia.value > 0) {
         return {
@@ -120,7 +115,7 @@ export async function deleteStorageBackend(backendId: string) {
 
     try {
         
-        await db.delete(storageBackends).where(eq(storageBackends.id, id));
+        await db.delete(storageBackends).where(eq(storageBackends.id, backendId));
         revalidatePath("/admin/storage");
         return { success: true };
     } catch (err) {

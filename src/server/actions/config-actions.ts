@@ -2,9 +2,9 @@
 
 import { db } from "@/db";
 import { platformConfig } from "@/db/schema";
-import { auth } from "@/server/auth";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/lib/permissions.server";
 import { logAuditEvent } from "@/lib/audit";
 
 export async function getRegistrationSetting() {
@@ -16,9 +16,7 @@ export async function getRegistrationSetting() {
 }
 
 export async function toggleRegistrationAction(currentStatus: boolean) {
-    const session = await auth();
-    const roleName = String(session?.user?.roleName || "")
-    if (roleName !== "Super Admin") throw new Error("Unauthorized");
+    await requirePermission("can_change_config")
 
     const newValue = !currentStatus;
     await db.insert(platformConfig)
@@ -52,8 +50,7 @@ export async function getVidTranscodeSettings() {
 }
 
 export async function updateVidTranscodeSettings(newSettings: any) {
-    const session = await auth();
-    if (session?.user?.roleName !== "Super Admin") throw new Error("Unauthorized");
+    await requirePermission("can_change_config");
     
     await db.insert(platformConfig)
         .values({ key: 'video transcoding', value: newSettings })

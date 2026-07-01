@@ -8,11 +8,12 @@ import { usePathname } from "next/navigation";
 
 interface SidebarProps {
     userRole?: string;
+    permissions?: Record<string, boolean>;
     storageUsed?: number;
     storageQuota?: number;
 }
 
-export default function Sidebar({ userRole, storageUsed = 0, storageQuota = 5120 }: SidebarProps) {
+export default function Sidebar({ userRole, permissions, storageUsed = 0, storageQuota = 5120 }: SidebarProps) {
     const pathname = usePathname();
     const navItems = [
         { icon: ImageIcon, label: "Photos", href: "/photos", active: true },
@@ -62,7 +63,7 @@ export default function Sidebar({ userRole, storageUsed = 0, storageQuota = 5120
                 </div>
             </div>
 
-            {userRole === "Super Admin" && (
+            {(permissions?.can_manage_server || permissions?.can_manage_users || permissions?.can_view_analytics || permissions?.can_view_audit_log) && (
                 <div>
                     <nav className="space-y-1">
                         <Link href="/admin" className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${isActive("/admin") ? 'bg-orange-500/10 text-orange-500' : 'text-muted hover:bg-surface hover:text-foreground'}`}>

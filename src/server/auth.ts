@@ -8,17 +8,20 @@ import { compare } from "bcrypt";
 import { env } from "@/lib/env";
 import { DefaultSession } from "next-auth";
 import { redisCache } from "@/lib/cache";
+import type { Permissions } from "@/lib/permissions";
 
 declare module "next-auth" {
     interface Session {
         user: {
             id: string;
             roleName: string;
+            permissions: Permissions;
         } & DefaultSession["user"]
     }
 
     interface User {
         roleName?: string;
+        permissions?: Permissions;
     }
 }
 
@@ -59,7 +62,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     id: user.id,
                     name: user.username,
                     email: user.email,
-                    roleName: user.role.name
+                    roleName: user.role.name,
+                    permissions: user.role.permissions as Permissions
                 };
             }
         })
@@ -69,6 +73,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (user) {
                 token.id = user.id;
                 token.roleName = (user as any).roleName;
+                token.permissions = (user as any).permissions;
             }
             return token;
         },
@@ -77,6 +82,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (token && session.user) {
                 session.user.id = token.id as string;
                 session.user.roleName = token.roleName as string;
+                session.user.permissions = token.permissions as Permissions;
 
                 const isRevoked = await redisCache.get(`revoked_session:${token.id}`);
                 if (isRevoked) {

@@ -5,8 +5,7 @@ import Topbar from "@/components/layout/Topbar";
 import { eq } from "drizzle-orm";
 import { db } from "@/db"
 import { users } from "@/db/schema"
-import NotificationProvider from "@/components/providers/NotificationProvider";
-
+import React from "react";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
     const session = await auth();
@@ -22,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
     return (
             <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
-                <Sidebar userRole={session.user.roleName} storageUsed={userStats?.storageUsed || 0} storageQuota={userStats?.storageQuota || 5120} />
+                <Sidebar userRole={session.user.roleName} permissions={session.user.permissions} storageUsed={userStats?.storageUsed || 0} storageQuota={userStats?.storageQuota || 5120} />
                 <div className="flex-1 flex flex-col min-w-0">
                     <Topbar user={session.user} />
                     <main className="flex-1 overflow-y-auto overflow-x-hidden relative">
