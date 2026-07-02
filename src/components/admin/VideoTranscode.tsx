@@ -55,7 +55,7 @@ export default function VideoTranscode({ currentSettings }: { currentSettings: a
                     </div>
                 </div>
                 <div className="pt-2 flex justify-end">
-                    <button onClick={handleSave} disabled={isPending} className="flex items-center gap-2 bg-foreground px-4 py-2 text-xs font-bold hover:bg-orange-500 hover:text-white transition-colors disabled:opacity-50">
+                    <button onClick={handleSave} disabled={isPending} className="flex items-center gap-2 bg-foreground px-4 py-2 text-xs font-bold bg-orange-500 hover:bg-orange-700 hover:text-white transition-colors disabled:opacity-50">
                         {isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                         {isSaved ? "Saved!" : "Save Rules"}
                     </button>

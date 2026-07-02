@@ -447,6 +447,8 @@ export async function processAiIndexing(mediaId: string) {
     let detectedFaces: any[] = [];
     let extractedText: string | null = null;
     let aestheticScore: number | null = null;
+    const { getAiSettings } = await import("@/server/actions/config-actions");
+    const aiSettings: any = await getAiSettings();
     const isVideo = item.mimetype.startsWith("video/")
 
     let buffer: Buffer;
@@ -468,6 +470,14 @@ export async function processAiIndexing(mediaId: string) {
         const aiResp = await fetch(`${env.ML_API_URl}/analyze/image`, {
             method: "POST",
             body: formData as any,
+            headers: {
+              "x-enable-clip": String(aiSettings.clip_enabled ?? true),
+              "x-enable-faces": String(aiSettings.face_detection_enabled ?? true),
+              "x-enable-ocr": String(aiSettings.ocr_enabled ?? true),
+              "x-enable-nima": String(aiSettings.aesthetic_scoring_enabled ?? true),
+              "x-enable-tags": String(aiSettings.auto_tagging_enabled ?? true),
+              "x-face-confidence": String(aiSettings.face_confidence_threshold ?? 0.85),
+            }
         });
 
         if (aiResp.ok) {
@@ -530,7 +540,7 @@ export async function processAiIndexing(mediaId: string) {
 
             let personId: string;
             const closestMatch = result[0] as { person_id: string, distance: number } | undefined;
-            if (closestMatch && closestMatch.distance < 0.40) {
+            if (closestMatch && closestMatch.distance < (aiSettings.face_distance_threshold ?? 0.40)) {
                 personId = closestMatch.person_id;
             } else {
                 const newPerson = await db.insert(people).values({

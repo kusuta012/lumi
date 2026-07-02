@@ -10,6 +10,8 @@ import { getMaintenanceSetting } from "@/server/actions/storage-actions";
 import MaintenanceToggle from "@/components/admin/MaintenanceToggle";
 import { cacheRedis } from "@/lib/cache";
 import VideoTranscode from "@/components/admin/VideoTranscode";
+import AiModelSettings from "@/components/admin/AiModelSettings";
+import { getAiSettings } from "@/server/actions/config-actions";
 
 async function checkDatabase() {
     try {
@@ -53,6 +55,7 @@ export default async function AdminPage() {
     const allowReg = await getRegistrationSetting();
     const isMaintenance = await getMaintenanceSetting();
     const transcodeSettings = await getVidTranscodeSettings();
+    const aiSettings = await getAiSettings();
     const ram = getRamUsage();
 
     const [userCountResult] = await db.select({ value: count() }).from(users);
@@ -121,7 +124,6 @@ export default async function AdminPage() {
                             <RegistrationToggle isEnabled={allowReg} />
                             <MaintenanceToggle isEnabled={isMaintenance} />
                         </div>
-                        <VideoTranscode currentSettings={transcodeSettings} />
                     </div>
                 </div>
             </div>
@@ -140,6 +142,9 @@ export default async function AdminPage() {
                 </Link>
                 <Link href="/admin/roles" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
                     ROLE MANAGEMENT
+                </Link>
+                <Link href="/admin/config" className="border border-border p-3 text-center text-sm font-bold text-foreground hover:border-orange-500 hover:text-orange-500 transition-none bg-background">
+                    PROCESS CONFIG
                 </Link>
             </div>
         </div>

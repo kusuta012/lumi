@@ -12,3 +12,4 @@ insightface
 onnxruntime
 optimum[onnxruntime]
 pyiqa
+psutil
