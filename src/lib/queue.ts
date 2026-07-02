@@ -1,8 +1,7 @@
 import { Queue, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
 import { env } from './env';
-import { GTakeoutImport } from '@/server/services/takeout-importer';
-import { concurrency } from 'sharp';
+import { isFlipperEnabled } from './flippers';
 
 const connection = new IORedis(env.REDIS_URL, {
     maxRetriesPerRequest: null,

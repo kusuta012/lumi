@@ -7,6 +7,7 @@ import { storageBackends } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { env } from "@/lib/env";
+import { isFlipperEnabled } from "@/lib/flippers";
 
 async function getS3Client() {
     const defaultBackend = await db.query.storageBackends.findFirst({
@@ -32,6 +33,9 @@ async function getS3Client() {
 export async function initMultipartUpload(filename: string, contentType: string) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const uploadsOn = await isFlipperEnabled("uploads_enabled");
+    if (!uploadsOn) throw new Error("Uploads are currently disabled by the administrator");
 
     try {
         const { s3, bucket, backendId } = await getS3Client();

@@ -8,11 +8,14 @@ import { redisCache } from "@/lib/cache";
 import yazl from "yazl";
 import { PassThrough } from "stream";
 import { randomUUID } from "crypto";
-import { arch } from "os";
+import { isFlipperEnabled } from "@/lib/flippers";
 
 export async function POST(req: NextRequest) {
     const session = await auth();
     if (!session) return new NextResponse("Unauthorized", { status: 401 });
+
+    const downloadsEnabled = await isFlipperEnabled("downloads_enabled");
+    if (!downloadsEnabled) return new NextResponse("Downloads are temporarily disabled by administrator", { status: 403 });
 
     const { ids } = await req.json();
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -27,6 +30,9 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
     const session = await auth();
     if (!session) return new NextResponse("Unauthorized", { status: 401 });
+
+    const downloadsEnabled = await isFlipperEnabled("downloads_enabled");
+    if (!downloadsEnabled) return new NextResponse("Downloads are temporarily disabled by administrator", { status: 403 });
 
     const { searchParams } = new URL(req.url);
     const token = searchParams.get("token");

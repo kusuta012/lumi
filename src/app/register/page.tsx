@@ -1,9 +1,10 @@
 import { getRegistrationSetting } from "@/server/actions/config-actions";
 import Link from "next/link";
 import RegisterForm from "./RegisterForm";
+import { isFlipperEnabled } from "@/lib/flippers";
 
 export default async function RegisterPage() {
-    const isRegistrationOpen = await getRegistrationSetting();
+    const isRegistrationOpen = await isFlipperEnabled("registration_enabled");
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">

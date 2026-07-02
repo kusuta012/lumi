@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { addMediaToPipe } from "@/lib/queue"
 import { eq, sql } from "drizzle-orm"
 import { redisCache, cacheInvalid } from "@/lib/cache";
+import { isFlipperEnabled } from "@/lib/flippers";
  
 export async function recordMediaUpload(data: {
     filename: string;
@@ -18,6 +19,9 @@ export async function recordMediaUpload(data: {
 }) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const uploadsOn = await isFlipperEnabled("uploads_enabled");
+    if (!uploadsOn) throw new Error("Uploads are currently disabled by the adminstrator");
     
     try {
         const sizeInMB = data.size > 0 ? Math.max(1, Math.round(data.size / (1024 * 1024))) : 0;

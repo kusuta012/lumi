@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { getStorageClient } from "@/lib/storage";
 import { redisCache, cacheInvalid, cacheRedis } from "@/lib/cache";
 import { subDays } from "date-fns";
+import { isFlipperEnabled } from "@/lib/flippers";
 
 async function verifyOwnership(mediaId: string) {
   const session = await auth();
@@ -200,12 +201,16 @@ export async function purgeMediaItemsSys(mediaIds: string[], userId: string) {
 }
 
 export async function cleanExpiredTrash() {
-  const thirtDaysAgo = subDays(new Date(), 30);
+  const trashEnabled = await isFlipperEnabled("trash_empty_enabled");
+  if (!trashEnabled) {
+    return;
+  }
+  const thirtyDaysAgo = subDays(new Date(), 30);
   try {
     const expiredItems = await db.select().from(media).where(
       and(
         eq(media.isDeleted, true),
-        lt(media.deletedAt, thirtDaysAgo)
+        lt(media.deletedAt, thirtyDaysAgo)
       )
     );
 

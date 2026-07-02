@@ -8,10 +8,14 @@ import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 import { eq, and , gt } from "drizzle-orm";
 import { subHours } from "date-fns";
+import { isFlipperEnabled } from "@/lib/flippers";
 
 export async function requestTakeout() {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const takeoutEnabled = await isFlipperEnabled("takeouts_enabled");
+    if (!takeoutEnabled) return { success: false, error: "Data exports are temporarily disabled to conserve server resources" };
 
     try {
         const recentRequest = await db.query.auditLogs.findFirst({
@@ -41,6 +45,10 @@ export async function requestTakeout() {
 export async function startGtakeoutImport(zipObjectKey: string) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const takeoutEnabled = await isFlipperEnabled("takeouts_enabled");
+    if (!takeoutEnabled) return { success: false, error: "Imports are temporarily disabled to conserve server resources" };
+
     try {
         await GtakeoutQueue.add("googlu-import", {
             userId: session.user.id,

@@ -4,10 +4,14 @@ import { getStorageClient } from "@/lib/storage";
 import { db } from "@/db";
 import { storageBackends } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isFlipperEnabled } from "@/lib/flippers";
 
 export async function GET(req: NextRequest) {
     const session = await auth();
     if(!session?.user?.id) return new NextResponse("Unauthorized", { status: 404});
+
+    const takeoutEnabled = await isFlipperEnabled("takeouts_enabled");
+    if (!takeoutEnabled) return new NextResponse("Takeout downloads are currently disabled by the administrator", { status: 403 });
 
     const { searchParams } = new URL(req.url);
     const fileKey = searchParams.get("file");

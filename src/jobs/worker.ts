@@ -16,6 +16,7 @@ import { sysCleanupQueue } from "@/lib/queue";
 import { cleanExpShareLinks } from "@/server/actions/share-actions";
 import fs from "fs/promises";
 import os from "os";
+import { isFlipperEnabled } from "@/lib/flippers";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -36,6 +37,10 @@ const thumbnailWorker = new Worker(
 const aiWorker = new Worker(
     'ai-indexing',
     async (job) => {
+        const aiEnabled = await isFlipperEnabled("ai_processing_enabled");
+        if (!aiEnabled) {
+            return;
+        }
         await processAiIndexing(job.data.mediaId);
     }, { connection, concurrency: 2 });
 
@@ -59,6 +64,10 @@ const systemWorker = new Worker(
 const faceClusterWorker = new Worker(
     'face-clustering',
     async (job) => {
+        const clusterEnabled = await isFlipperEnabled("face_clustering_enabled");
+        if(!clusterEnabled) {
+            return;
+        }
         await faceClustering(job);
     },
     { connection, concurrency: 1 }

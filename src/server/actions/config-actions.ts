@@ -6,6 +6,9 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/permissions.server";
 import { logAuditEvent } from "@/lib/audit";
+import type { FlipperKey } from "@/lib/flipper-constants";
+import { FLIPPER_DEFAULTS, FLIPPER_COOLDOWNS, FLIPPER_META } from "@/lib/flipper-constants";
+import { cacheRedis, redisCache } from "@/lib/cache";
 
 export async function getRegistrationSetting() {
     const setting = await db.query.platformConfig.findFirst({
@@ -90,6 +93,52 @@ export async function updateAiSetting(newSettings: any) {
         });
     
     await logAuditEvent("ai_settings_updated", "config", "ai_settings", newSettings);
+    revalidatePath("/admin");
+    return { success: true };
+}
+
+export async function getFlipperSettings(): Promise<Record<FlipperKey, boolean>> {
+    const row = await db.query.platformConfig.findFirst({
+        where: eq(platformConfig.key, "feature_flippers"),
+    });
+    return { ...FLIPPER_DEFAULTS, ...(row?.value as any || {}) };
+}
+
+export async function updateFlippers(newState: Record<FlipperKey, boolean>) {
+    await requirePermission("can_manage_flippers");
+
+    const currentState = await getFlipperSettings();
+    const changedKeys = (Object.keys(newState) as FlipperKey[]).filter(
+        key => newState[key] !== currentState[key]
+    );
+
+    for (const key of changedKeys) {
+        const onCooldown = await cacheRedis.get(`flipper_cooldown:${key}`);
+        if (onCooldown) {
+            const ttl = await cacheRedis.ttl(`flipper_cooldown:${key}`);
+            const meta = FLIPPER_META.find(m => m.key === key);
+            const label = meta ? meta.label : key;
+            return { success: false, error: `"${label}" is on cooldown, Try again in ${ttl} seconds` };
+        }
+    }
+    await db.insert(platformConfig)
+        .values({ key: "feature_flippers", value: newState })
+        .onConflictDoUpdate({
+            target: [platformConfig.key],
+            set: { value: newState, updatedAt: new Date() },
+        });
+
+    const pipeline = cacheRedis.pipeline();
+    for (const key of changedKeys) {
+        const cooldown = FLIPPER_COOLDOWNS[key];
+        if (cooldown > 0) {
+            pipeline.set(`flipper_cooldown:${key}`, "locked", "EX", cooldown);
+        }
+    }
+    pipeline.del("platform:flippers");
+    await pipeline.exec();
+    
+    await logAuditEvent("flippers_updated", "config", "feature_flippers", newState);
     revalidatePath("/admin");
     return { success: true };
 }

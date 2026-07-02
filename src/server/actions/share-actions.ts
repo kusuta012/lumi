@@ -10,6 +10,7 @@ import { eq, sql, and, ilike, not, or, notInArray, lt } from "drizzle-orm";
 import { broadcastAlbumUpdate } from "@/lib/pubsub";
 import { getAlbumRole, hasPermission } from "../services/rbac";
 import { cacheInvalid } from "@/lib/cache";
+import { isFlipperEnabled } from "@/lib/flippers";
 
 export async function createShareLink(data: {
     targetType: 'media' | 'album';
@@ -21,6 +22,9 @@ export async function createShareLink(data: {
 }) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const sharingOn = await isFlipperEnabled("sharing_enabled");
+    if (!sharingOn) return { success: false, error: "Sharing is currently disabled by the adminstrator" };
 
     if (data.targetType === 'album') {
         const role = await getAlbumRole(data.targetId, session.user.id);
@@ -61,6 +65,9 @@ export async function shareBulkMedia(mediaIds: string[], albumName: string, allo
     const session = await auth();
     if (!session?.user?.id) throw new Error ("Unauthorized");
     if (!mediaIds || mediaIds.length === 0) throw new Error("No media selected");
+
+    const sharingOn = await isFlipperEnabled("sharing_enabled");
+    if (!sharingOn) return { success: false, error: "Sharing is currently disabled by the adminstrator" };
 
     const token = nanoid(10);
     let expiresAt = null;
