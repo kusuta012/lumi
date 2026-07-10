@@ -17,6 +17,9 @@ import { cleanExpShareLinks } from "@/server/actions/share-actions";
 import fs from "fs/promises";
 import os from "os";
 import { isFlipperEnabled } from "@/lib/flippers";
+import { bloomFilter, BLOOM_KEYS } from "@/lib/bloom";
+import { db } from "@/db";
+import { users } from "@/db/schema";
 
 const connection = new IORedis(env.REDIS_URL!, {
     maxRetriesPerRequest: null, 
@@ -138,3 +141,20 @@ sysCleanupQueue.add('daily-cleanup', {}, {
     repeat: { pattern: '0 4 * * *' },
     jobId: 'daily-tmp-cleanup'
 });
+
+(async () => {
+    try {
+        const allUsers = await db.select({
+            username: users.username,
+            email: users.email
+        }).from(users);
+
+        const usernames = allUsers.map(u => u.username);
+        const emails = allUsers.map(u => u.email);
+        const uCount = await bloomFilter.rebuild(BLOOM_KEYS.USERNAMES, usernames);
+        const eCount = await bloomFilter.rebuild(BLOOM_KEYS.EMAILS, emails);
+        console.log(`bloom filters rebuilt - ${uCount} usernames, ${eCount} emails`);
+    } catch (err) {
+        console.error("bloom filter rebuild failed", err);
+    }
+})();

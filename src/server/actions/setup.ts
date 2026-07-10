@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { FLIPPER_DEFAULTS } from "@/lib/flipper-constants";
 import { Client } from "minio";
 import { env } from "@/lib/env";
+import { BLOOM_KEYS, bloomFilter } from "@/lib/bloom";
 
 export async function testStorageConnection(data: {
     endpoint: string;
@@ -111,6 +112,11 @@ export async function completeSetupAction(prevState: any, formData: FormData) {
             passwordHash,
             roleId: superAdminRole.id,
         });
+
+        await Promise.all([
+            bloomFilter.add(BLOOM_KEYS.USERNAMES, username),
+            bloomFilter.add(BLOOM_KEYS.EMAILS, email),
+        ]);
 
         if (storageType === "custom") {
             const s3Endpoint = formData.get("s3Endpoint") as string;

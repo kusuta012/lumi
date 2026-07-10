@@ -7,6 +7,7 @@ import MfaSetup from "@/components/profile/MfaSetup";
 import TakeoutBtn from "@/components/settings/TakeoutButton";
 import { format, subDays } from "date-fns";
 import TakeoutImport from "@/components/settings/TakeoutImport";
+import ProfileSettings from "@/components/settings/ProfileSettings";
 
 export default async function SettingsPg () {
     const session = await auth();
@@ -14,7 +15,7 @@ export default async function SettingsPg () {
 
     const user = await db.query.users.findFirst({
         where: eq(users.id, session.user.id),
-        columns: { mfaEnabled: true }
+        columns: { mfaEnabled: true, username: true, avatarUrl: true }
     }); // I AM HUNGRY I NEDED FOOOD RAADDAWF
     const completedTakeouts = await db.query.auditLogs.findMany({
         where: and(
@@ -40,6 +41,9 @@ export default async function SettingsPg () {
                 </h1>
                 <p className="text-muted text-sm mt-2">Manage your profile and other settings</p>
             </header>
+            <section>
+                <ProfileSettings user={user} />
+            </section>
             <section>
                 <MfaSetup initialEnabled={Boolean(user?.mfaEnabled)} />
             </section>

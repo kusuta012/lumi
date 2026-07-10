@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { hash } from "bcrypt";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isFlipperEnabled } from "@/lib/flippers";
+import { BLOOM_KEYS, bloomFilter } from "@/lib/bloom";
 
 export async function publicRegisterAction(prevState: any, formData: FormData) {
     const rateLimit = await checkRateLimit("register", 3, 3600);
@@ -19,6 +20,28 @@ export async function publicRegisterAction(prevState: any, formData: FormData) {
 
     const username = formData.get("username") as string;
     const email = formData.get("email") as string;
+    
+    const [usernameMayExist, emailMayExist] = await Promise.all([
+        bloomFilter.mightExist(BLOOM_KEYS.USERNAMES, username),
+        bloomFilter.mightExist(BLOOM_KEYS.EMAILS, email),
+    ]);
+
+    if (usernameMayExist) {
+        const existing = await db.query.users.findFirst({
+            where: eq(users.username, username),
+            columns: { id: true }
+        });
+        if (existing) return { error: "Username is already" };
+    }
+
+    if (emailMayExist) {
+        const existing = await db.query.users.findFirst({
+            where: eq(users.email, email),
+            columns: { id: true }
+        });
+        if (existing) return { error: "Email is already registered" };
+    }
+
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
 
@@ -60,6 +83,11 @@ export async function publicRegisterAction(prevState: any, formData: FormData) {
             roleId: defaultRole.id,
             storageQuota: 5120
         });
+
+        await Promise.all([
+            bloomFilter.add(BLOOM_KEYS.USERNAMES, username),
+            bloomFilter.add(BLOOM_KEYS.EMAILS, email),
+        ]);
 
         return { success: true };
     } catch (error) {

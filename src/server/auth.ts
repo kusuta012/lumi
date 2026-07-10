@@ -84,6 +84,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 session.user.roleName = token.roleName as string;
                 session.user.permissions = token.permissions as Permissions;
 
+                const { db } = await import("@/db");
+                const { users } = await import("@/db/schema");
+                const { eq } = await import("drizzle-orm");
+                const freshUser = await db.query.users.findFirst({
+                    where: eq(users.id, token.id as string),
+                    columns: { username: true, avatarUrl: true }
+                });
+                if (freshUser) {
+                    session.user.name = freshUser.username;
+                    session.user.image = freshUser.avatarUrl;
+                }
+
                 const isRevoked = await redisCache.get(`revoked_session:${token.id}`);
                 if (isRevoked) {
                     return null as any;

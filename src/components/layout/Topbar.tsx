@@ -92,8 +92,14 @@ export default function Topbar({ user }: { user: any }) {
                 )}
             </div>
             <div className="relative" ref={userMenuRef}>
-                <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-sm font-medium text-foreground cursor-pointer ml-2 hover:bg-orange-400 transition-colors">
-                    {user?.name?.charAt(0).toUpperCase()}
+                <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-sm font-medium text-foreground cursor-pointer ml-2 transition-colors border border-border">
+                    {user?.image ? (
+                        <img src={user.image} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="w-full h-full bg-orange-500 flex items-center justify-center hover:bg-orange-400 transition-colors">
+                            {user?.name?.charAt(0).toUpperCase()}
+                        </span>
+                    )}
                 </button>
             {isUserMenuOpen && (
                 <div className="absolute top-11 right-0 w-52 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">

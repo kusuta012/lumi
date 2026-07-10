@@ -30,6 +30,7 @@ export const users = pgTable('users', {
     username: text('username').unique().notNull(),
     email: text('email').unique().notNull(),
     passwordHash: text('password_hash'),
+    avatarUrl: text('avatar_url'),
     roleId: uuid('role_id').references(() => roles.id).notNull(),
     mfaSecret: text('mfa_secret'),
     mfaEnabled: boolean('mfa_enabled').default(false),
