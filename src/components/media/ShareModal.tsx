@@ -61,7 +61,7 @@ export default function ShareModal({ targetId, selectedIds, type, onClose, onSuc
             setIsSearching(true);
             const res = await searchUsersAction(searchQuery);
             if (res.success) {
-                const filtered = res.users.filter((u: any) => u.id !== session?.user?.id && !selectedUsers.find(su => su.id === u.id));
+                const filtered = (res.users || []).filter((u: any) => u.id !== session?.user?.id && !selectedUsers.find(su => su.id === u.id));
                 setSearchResults(filtered);
             }
             setIsSearching(false);

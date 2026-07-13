@@ -39,7 +39,7 @@ export async function processMigrationJob(sourceId: string, targetId: string) {
             try {
                 const keysToMove: string[] = [item.objectKey];
                 if (item.thumbnails) {
-                    Object.values(items.thumbnail as Record<string, string>).forEach(k => keysToMove.push(k));
+                    Object.values(item.thumbnails as Record<string, string>).forEach(k => keysToMove.push(k));
                 }
                 if (item.hoverSpriteKey) {
                     keysToMove.push(item.hoverSpriteKey);
