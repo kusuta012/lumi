@@ -81,15 +81,6 @@ export default function Sidebar({ userRole, permissions, storageUsed = 0, storag
                         <div className="bg-orange-500 h-full transition-all duration-1000" style={{ width: `${percentUsed}%` }} />
                     </div>
                 </div>
-                <div className="flex items-center justify-between mt-4 text-[10px] text-muted px-1">
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                        <span className="text-muted tracking-wider text-[10px]">
-                            Server Online
-                        </span>
-                    </div>
-                    <Info className="w-4 h-4 cursor-pointer hover:text-foreground" />
-                </div>
             </div>
         </aside>
     );
