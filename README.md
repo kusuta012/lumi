@@ -66,6 +66,7 @@ docker compose up -d --build
 ### 4. Push Database schema
 
 ```bash
+docker exec lumi-dev-postgres-1 psql -U lumi -d lumi -c "CREATE EXTENSION IF NOT EXISTS vector;"
 npx drizzle-kit push
 ```
 

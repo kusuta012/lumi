@@ -8,14 +8,14 @@ export default function StorageBackendForm() {
     const formRef = useRef<HTMLFormElement>(null);
     const handleAction = (formData: FormData) => {
         const data = {
-            name: formData.get("name"),
-            type: formData.get("type"),
+            name: formData.get("name") as string,
+            type: formData.get("type") as string,
             config: {
-                endpoint: formData.get("endpoint"),
-                bucket: formData.get("bucket"),
-                port: formData.get("port"),
-                accessKey: formData.get("accessKey"),
-                secretKey: formData.get("secretKey"),
+                endpoint: formData.get("endpoint") as string,
+                bucket: formData.get("bucket") as string,
+                port: formData.get("port") as string,
+                accessKey: formData.get("accessKey") as string,
+                secretKey: formData.get("secretKey") as string,
             }
         };
 

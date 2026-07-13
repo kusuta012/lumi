@@ -2,8 +2,6 @@ name: lumi-dev
 services:
   postgres:
     image: pgvector/pgvector:pg17
-    ports:
-     - "5432:5432"
     environment:
       POSTGRES_USER: lumi
       POSTGRES_PASSWORD: iykykoknoyes
