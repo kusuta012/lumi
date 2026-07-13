@@ -77,5 +77,9 @@ npm start
 ```
 
 # Images
-
-
+<img width="1902" height="1059" alt="image" src="https://github.com/user-attachments/assets/b5b01342-785a-4ba5-9dda-33840bafd7a0" />
+<img width="1911" height="1068" alt="image" src="https://github.com/user-attachments/assets/5d7febba-8fda-43e9-a4aa-4ec0cc251e76" />
+<img width="1908" height="1074" alt="image" src="https://github.com/user-attachments/assets/f4bc47eb-4cd0-45d6-a9f4-5abe2d0959b3" />
+<img width="1903" height="1063" alt="image" src="https://github.com/user-attachments/assets/31dfb8ac-901a-43de-9c00-721c133b4f24" />
+<img width="1909" height="1072" alt="image" src="https://github.com/user-attachments/assets/39654fa0-fd4a-4657-9e35-b887d0e02673" />
+<img width="1913" height="1069" alt="image" src="https://github.com/user-attachments/assets/036309b5-1f8b-43e4-9f84-9e01160c2ee0" />
