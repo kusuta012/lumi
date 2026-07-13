@@ -1,0 +1,160 @@
+import "dotenv/config";
+import { Job, Worker } from 'bullmq';
+import IORedis from 'ioredis';
+import { processMediaItem, processThumbnails, processAiIndexing } from '@/server/services/processor';
+import { env } from '@/lib/env'
+import { processMigrationJob } from "@/server/services/migration-processor";
+import { cleanExpiredTrash } from "@/server/actions/media-mutations";
+import path from "path";
+import { processTakeout } from "@/server/services/takeout-processor";
+import { systemQueue } from "@/lib/queue";
+import { SystemBackupJob } from "@/server/services/system-backup";
+import { aestheticBackfill } from "@/server/services/backfill";
+import { faceClustering } from "@/server/services/face-cluster";
+import { GTakeoutImport } from "@/server/services/takeout-importer";
+import { sysCleanupQueue } from "@/lib/queue";
+import { cleanExpShareLinks } from "@/server/actions/share-actions";
+import fs from "fs/promises";
+import os from "os";
+import { isFlipperEnabled } from "@/lib/flippers";
+import { bloomFilter, BLOOM_KEYS } from "@/lib/bloom";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+
+const connection = new IORedis(env.REDIS_URL!, {
+    maxRetriesPerRequest: null, 
+});
+
+const metadataWorker = new Worker(
+    'metadata-extraction',
+    async (job) => {
+        await processMediaItem(job.data.mediaId);
+    }, { connection, concurrency: 8 });
+
+const thumbnailWorker = new Worker(
+    'thumbnail-generation',
+    async (job) => {
+        await processThumbnails(job.data.mediaId);
+    }, { connection, concurrency: 4 });
+
+const aiWorker = new Worker(
+    'ai-indexing',
+    async (job) => {
+        const aiEnabled = await isFlipperEnabled("ai_processing_enabled");
+        if (!aiEnabled) {
+            return;
+        }
+        await processAiIndexing(job.data.mediaId);
+    }, { connection, concurrency: 2 });
+
+const takeoutWorker = new Worker(
+    'takeout-generation',
+    async (job) => {
+        await processTakeout(job.data.userId);
+    }, { connection, concurrency: 1 });
+
+const systemWorker = new Worker(
+    'system-tasks',
+    async (job) => {
+        if (job.name === "database-backup") {
+            await SystemBackupJob(job.data?.userId);
+        }
+        if (job.name === "aesthetic-backfill") {
+            await aestheticBackfill(job);
+        }
+    }, { connection, concurrency: 1 });
+
+const faceClusterWorker = new Worker(
+    'face-clustering',
+    async (job) => {
+        const clusterEnabled = await isFlipperEnabled("face_clustering_enabled");
+        if(!clusterEnabled) {
+            return;
+        }
+        await faceClustering(job);
+    },
+    { connection, concurrency: 1 }
+);
+
+const takeoutImportWorker = new Worker(
+    'takeout-import',
+    async (job) => { await GTakeoutImport(job); },
+    { connection, concurrency: 1 }
+);
+
+const sysCleanupWorker = new Worker(
+    'system-cleanup',
+    async () => {
+        const tmpDir = os.tmpdir();
+        const files = await fs.readdir(tmpDir);
+        const now = Date.now();
+        const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+        for (const file of files) {
+            if (file.startsWith("lumi-pipe-") || file.startsWith("lumi-takeout-")) {
+                const fullPath = path.join(tmpDir, file);
+                const stats = await fs.stat(fullPath);
+                if (now - stats.mtimeMs > MAX_AGE_MS) {
+                    await fs.rm(fullPath, { recursive: true, force: true });
+                    console.log(`removed orphan tmep dir: ${file}`);
+                }
+            }
+        }
+
+        await cleanExpShareLinks();
+        await cleanExpiredTrash();
+    },
+    { connection, concurrency: 1 }
+);
+
+
+function logging(worker: Worker, name: string) {
+    worker.on('completed', (job) => console.log(`[${name} job ${job.id}] completed`));
+    worker.on('failed', (job, err) => console.error([`${name} job ${job?.id} Failed:`, err]));
+}
+
+logging(metadataWorker, "Metadata");
+logging(thumbnailWorker, "Thumbnail");
+logging(aiWorker, "AI index");
+logging(takeoutWorker, "Takeout");
+logging(systemWorker, "System");
+logging(faceClusterWorker, "Face Cluster");
+logging(takeoutImportWorker, "Takeout Import" );
+logging(sysCleanupWorker, "System Cleanup");
+
+console.log('lumi workers are active')
+const migrator = new Worker('storage-migration', async (job) => {
+    await processMigrationJob(job.data.sourceId, job.data.targetId);
+}, { connection });
+
+console.log('lumi migration worker is active');
+
+systemQueue.add("database-backup", { userId: "system_cron" }, {
+    repeat: { pattern: "0 3 * * *" }
+});
+systemQueue.add("aesthetic-backfill", {}, {
+    repeat: { pattern: "30 3 * * *" },
+    jobId: "cutie-aesthetic-backfill"
+}) 
+
+sysCleanupQueue.add('daily-cleanup', {}, {
+    repeat: { pattern: '0 4 * * *' },
+    jobId: 'daily-tmp-cleanup'
+});
+
+(async () => {
+    try {
+        const allUsers = await db.select({
+            username: users.username,
+            email: users.email
+        }).from(users);
+
+        const usernames = allUsers.map(u => u.username);
+        const emails = allUsers.map(u => u.email);
+        const uCount = await bloomFilter.rebuild(BLOOM_KEYS.USERNAMES, usernames);
+        const eCount = await bloomFilter.rebuild(BLOOM_KEYS.EMAILS, emails);
+        console.log(`bloom filters rebuilt - ${uCount} usernames, ${eCount} emails`);
+    } catch (err) {
+        console.error("bloom filter rebuild failed", err);
+    }
+})();

@@ -1,0 +1,484 @@
+"use client";
+
+import { useState, useTransition, useEffect, useCallback, useRef, useMemo} from "react";
+import Lightbox from "./Lightbox";
+import { Check, CheckCircle2, Plus, Share2, Trash2, X, RefreshCcw, Download } from "lucide-react";
+import AddToAlbumModal from "./AddToAlbumModal";
+import { restoreMediaAction, deletePermanentlyAction, bulkMoveToTrashAction } from "@/server/actions/media-mutations";
+import ShareModal from "./ShareModal";
+import { useNotification } from "../providers/NotificationProvider";
+import { useInView } from "react-intersection-observer";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useRouter } from "next/navigation";
+import TimelineScrub, { ScrubberPoint } from "./TimelineScrub";
+
+interface MediaItem {
+    id: string,
+    filename: string;
+    dateTaken: Date | null;
+    createdAt: Date;
+    isFavorited: boolean | null;
+    isArchived: boolean | null;
+    isDeleted: boolean | null;
+    mimetype: string;
+    size: number;
+    width: number | null;
+    height: number | null;
+    duration?: number | null;
+}
+
+interface Props {
+    initialMedia: MediaItem[];
+    startYear: number;
+    endYear: number;
+    allYearMonths?: { year: number; month: number }[];
+    emptyMessage?: string;
+    isTrashPage?: boolean;
+    isLockedPage?: boolean;
+    isSearchPage?: boolean;
+    albumId?: string;
+    isOwner?: boolean;
+    allowDownload?: boolean;
+}
+
+function formatDuration(seconds: number | null | undefined): string {
+    if (!seconds) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+export default function TimelineGallery({ initialMedia, startYear, endYear, allYearMonths, emptyMessage, isTrashPage = false,  isLockedPage = false, isSearchPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
+    const { notify } = useNotification();
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [showAlbumModal, setShowAlbumModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [isPending, startTransition] = useTransition();
+    const isSelectionMode = selectedIds.length > 0;
+    const [mediaItems, setMediaItems] = useState<MediaItem[]>(initialMedia);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
+    const [cursor, setCursor] = useState<{ts: string, id: string} | null>(
+        initialMedia.length === 50 && !isSearchPage ? {
+            ts: new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString(),
+            id: initialMedia[initialMedia.length - 1].id
+        } : null
+    )
+    const [hasMore, setHasMore] = useState(initialMedia.length >= 50);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const { ref: loadMoreRef, inView } = useInView({
+        rootMargin: '600px',
+    });
+    const router = useRouter();
+    const pendingScrollYearRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (!albumId) return;
+
+        const eventSource = new EventSource(`/api/albums/${albumId}/events`);
+
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "UPDATE") {
+                router.refresh();
+            }
+        };
+
+        return () => {
+            eventSource.close();
+        };
+    }, [albumId, router]);
+    
+
+    const loadMorePhotos = useCallback(async () => {
+        if (isLoadingMore || !hasMore || isTrashPage || isLockedPage || isSearchPage || albumId || !cursor) return;
+        setIsLoadingMore(true);
+        try {
+            const res = await fetch(`/api/photos/timeline?cursor=${cursor.ts}&cursorId=${cursor.id}`);
+            if (res.ok) {
+                const json = await res.json();
+                const newPhotos = json.data.map((m: any) => ({
+                    ...m,
+                    dateTaken: m.dateTaken ? new Date(m.dateTaken) : null,
+                    createdAt: new Date(m.createdAt)
+                }));
+
+                const existingIds = new Set(mediaItems.map(m => m.id));
+                const unique = newPhotos.filter((m: MediaItem) => !existingIds.has(m.id));
+
+                if (unique.length > 0) {
+                    setMediaItems(prev => [...prev, ...newPhotos]);  
+                }
+                
+                if (json.nextCursorTs && json.nextCursorId) {
+                    setCursor({
+                        ts: json.nextCursorTs,
+                        id: json.nextCursorId
+                    });
+                } else {
+                    setCursor(null);
+                    setHasMore(false);
+                }
+                
+            } else {
+                console.error("internal server error, pagination failed");
+                setHasMore(false);
+            }
+        } catch (err) {
+            console.error("failed to load more photos");
+            setHasMore(false);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [cursor, hasMore, isLoadingMore, isTrashPage, isLockedPage, albumId]);
+
+    const jumpToDate = useCallback(async (year: number, month?: number) => {
+        if (isLoadingMore) return;
+        setIsLoadingMore(true);
+        try {
+            const res = await fetch(`/api/photos/timeline?jumpToYear=${year}${month ? `&jumpToMonth=${month}` : ''}`);
+            if (res.ok) {
+                const json = await res.json();
+                const newPhotos = json.data.map((m: any) => ({
+                    ...m,
+                    dateTaken: m.dateTaken ? new Date(m.dateTaken) : null,
+                    createdAt: new Date(m.createdAt)
+                }));
+
+                setMediaItems(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const unique = newPhotos.filter((m: MediaItem) => !existingIds.has(m.id));
+                    const merged = [...prev, ...unique];
+                    merged.sort((a: MediaItem, b: MediaItem) => {
+                        const timeA = new Date(a.dateTaken || a.createdAt).getTime();
+                        const timeB = new Date(b.dateTaken || b.createdAt).getTime();
+                        return timeB - timeA;
+                    });
+                    return merged;
+                });
+                
+                pendingScrollYearRef.current = year;
+            }
+        } catch (err) {
+            console.error("failed to jump year", year);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [isLoadingMore]);
+
+    useEffect(() => {
+        if (inView) {
+            loadMorePhotos();
+        }
+    }, [inView, loadMorePhotos]);
+
+    useEffect(() => {
+        if (
+            selectedIndex !== null &&
+            selectedIndex >= mediaItems.length - 5 &&
+            hasMore &&
+            !isLoadingMore
+        ) {
+            loadMorePhotos();
+        }
+    }, [selectedIndex, mediaItems.length, hasMore, isLoadingMore, loadMorePhotos]);
+
+    useEffect(() => {
+        setMediaItems(initialMedia);
+        setCursor(initialMedia.length >= 50 && !isSearchPage ? {
+            ts: new Date(initialMedia[initialMedia.length - 1].dateTaken || initialMedia[initialMedia.length - 1].createdAt).toISOString(),
+            id: initialMedia[initialMedia.length - 1].id } : null);
+        setHasMore(initialMedia.length >= 50 && !isSearchPage);
+    }, [initialMedia, isSearchPage]);
+
+    const groupedMedia = mediaItems.reduce<Record<string, MediaItem[]>>((acc, item) => {
+        const d = item.dateTaken ? new Date(item.dateTaken) : new Date(item.createdAt);
+        const dateKey = d.toLocaleDateString('en-US', {
+            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+        });
+        if (!acc[dateKey]) acc[dateKey] = [];
+        acc[dateKey].push(item);
+        return acc;
+    }, {});
+
+    const sortedGroups = Object.entries(groupedMedia).sort((a, b) => {
+        const timeA = new Date(a[1][0].dateTaken || a[1][0].createdAt).getTime();
+        const timeB = new Date(b[1][0].dateTaken || b[1][0].createdAt).getTime();
+        return timeB -timeA;
+    });
+
+    const listRef = useRef<HTMLDivElement>(null);
+    const virtualizer = useVirtualizer({
+        count: sortedGroups.length,
+        getScrollElement: () => typeof document !== 'undefined' ? document.querySelector('main') : null,
+        estimateSize: () => 800,
+        overscan: 4,
+    })
+
+    useEffect(() => {
+        const targetYear = pendingScrollYearRef.current;
+        if (targetYear === null) return;
+
+        const groupIndex = sortedGroups.findIndex(([, items]) => {
+            const d = new Date(items[0].dateTaken || items[0].createdAt);
+            return d.getFullYear() === targetYear;
+        });
+
+        if (groupIndex >= 0) {
+            pendingScrollYearRef.current = null;
+            virtualizer.scrollToIndex(groupIndex, { align: 'start' });
+        }
+    }, [sortedGroups, virtualizer]);
+
+    const timelinePoints = useMemo(() => {
+        const points: ScrubberPoint[] =[];
+        const seenYears = new Set<string>();
+        const seenYearMonths = new Set<string>();
+        const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const loadedYearMonths = new Set<string>();
+
+        sortedGroups.forEach(([dateString, items], index) => {
+            const date = new Date(items[0].dateTaken || items[0].createdAt);
+            loadedYearMonths.add(`${date}.getFullYear()-${date.getMonth() + 1}`);
+        });
+
+        if (allYearMonths && allYearMonths.length > 0) {
+            allYearMonths.forEach(({ year, month }) => {
+                const yearStr = year.toString();
+                const monthStr = monthNames[month];
+                const yearMonthKey = `${year}-${month}`;
+                
+                let groupIndex = -1;
+                if (loadedYearMonths.has(yearMonthKey)) {
+                    groupIndex = sortedGroups.findIndex(([, items]) => {
+                        const d = new Date(items[0].dateTaken || items[0].createdAt);
+                        return d.getFullYear() === year && d.getMonth() + 1 === month;
+                    });
+                }
+
+                if (!seenYears.has(yearStr)) {
+                    seenYears.add(yearStr);
+                    points.push({ label: yearStr, month: monthStr, index: groupIndex, jumpYear: groupIndex === -1 ? year: undefined });
+                }
+
+                if (!seenYearMonths.has(yearMonthKey)) {
+                    seenYearMonths.add(yearMonthKey);
+                    points.push({ label: "", month: monthStr, index: groupIndex, jumpYear: groupIndex === -1 ? year : undefined, jumpMonth: groupIndex === -1 ? month : undefined });
+                }
+            });
+        } else {
+            sortedGroups.forEach(([dateString, items], index) => {
+                const date = new Date(items[0].dateTaken || items[0].createdAt);
+                const year = date.getFullYear().toString();
+                const month = date.toLocaleDateString('en-US', { month: 'short' });
+                const yearMonthKey = `${year}-${month}`;
+                if (!seenYears.has(year)) {
+                    seenYears.add(year);
+                    points.push({ label: year, month, index });
+                }
+
+                if (!seenYearMonths.has(yearMonthKey)) {
+                    seenYearMonths.add(yearMonthKey);
+                    points.push({ label: "", month, index });
+                }
+            });
+        }
+
+        return points;
+    }, [sortedGroups, allYearMonths]);
+
+    const handleScrollToSection = (index: number, jumpYear?: number, jumpMonth?: number) => {
+        if (jumpYear !== undefined) {
+            jumpToDate(jumpYear, jumpMonth);
+            return;
+        }
+        if (index >= 0) {
+            virtualizer.scrollToIndex(index, { align: "start" });
+        }
+    };
+
+    const toggleSelect = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const isDateGroupAllSelected = (items: MediaItem[]) => {
+        return items.every(item => selectedIds.includes(item.id));
+    };
+
+    const toggleSelectDateGroup = (items: MediaItem[], e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const allSelected = isDateGroupAllSelected(items);
+        const groupIds = items.map(item => item.id);
+
+        if (allSelected) {
+            setSelectedIds(prev => prev.filter(id => !groupIds.includes(id)));
+        } else {
+            setSelectedIds(prev => [...new Set([...prev, ...groupIds])]);
+        }
+    };
+
+    const clearSelection = () => setSelectedIds([]);
+    const handleRestore = () => {
+        if (!confirm(`Restore ${selectedIds.length} items?`)) return;
+        startTransition(async () => {
+            await restoreMediaAction(selectedIds);
+            clearSelection();
+        });
+    };
+    const handleDeletePermanently = () => {
+        if (!confirm(`Permanently delete ${selectedIds.length} items? This annot be undone`)) return;
+        startTransition(async () => {
+            await deletePermanentlyAction(selectedIds);
+            clearSelection();
+        });
+    };
+
+    const handleBulkTrash = () => {
+        startTransition(async () => {
+            await bulkMoveToTrashAction(selectedIds);
+            clearSelection();
+        });
+    };
+
+    const handleBulkDownload = () => {
+        startTransition(async () => {
+            try {
+                const res = await fetch("/api/download/batch", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids: selectedIds }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    window.location.href = data.url;
+                    clearSelection();
+                } else {
+                    notify("error", "Error", "Failed to prepare download");
+                }
+            } catch (err) {
+                notify("error", "Error", "Failed to initiate download");
+            }
+        })
+    };
+
+    return(
+        <div className="p-6 pb-24 relative" ref={listRef}>
+            {isSelectionMode && (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] flex items-center gap-6 px-6 py-3 bg-surface border border-border rounded-full shadow-2xl animate-in slide-in-from-top duration-300">
+                    <div className="flex items-center gap-3 pr-4 border-r border-border">
+                        <button onClick={clearSelection} className="p-1 hover:bg-surface-hover rounded-full transition-colors">
+                            <X size={18} className="text-muted" />
+                        </button>
+                        <span className="text-sm font-bold text-foreground">{selectedIds.length} selected</span>
+                    </div>
+                    <div className="flex items-center gap-5">
+                        {isTrashPage ? (
+                            <>
+                                <button onClick={handleRestore} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-emerald-400 hover:text-emerald-300 transition-colors">
+                                    <RefreshCcw size={18} /> Restore
+                                </button>
+                                <button onClick={handleDeletePermanently} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-red-500 hover:text-red-400 transition-colors">
+                                    <Trash2 size={18} /> Delete forever
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                            <button onClick={() => setShowAlbumModal(true)} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors">
+                            <Plus size={18} />
+                        </button>
+                        <button onClick={() => setShowShareModal(true)} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors">
+                            <Share2 size={18} />
+                        </button>
+                        <button onClick={handleBulkDownload} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors">
+                            <Download size={18} />
+                        </button>
+                        <button onClick={handleBulkTrash} disabled={isPending} className="flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors">
+                            <Trash2 size={18} />
+                        </button> 
+                            </>
+                        )}  
+                    </div>
+                </div>
+            )}
+
+            {initialMedia.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 text-muted">
+                    <p>{emptyMessage}</p>
+                </div>
+            ) : (
+                <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative'}}>
+                    {virtualizer.getVirtualItems().map((virtualRow) => {
+                        const [date, items] = sortedGroups[virtualRow.index];
+                        const isAllSelected = isDateGroupAllSelected(items);
+                        return (
+                            <div key={date} data-index={virtualRow.index} ref={virtualizer.measureElement} className="absolute top-0 left-0 w-full pb-12" style={{ transform: `translateY(${virtualRow.start}px)` }}>
+                            <div className="flex items-center gap-2 mb-4 py-2.5 px-2 -mx-2 group/date">
+                            <button onClick={(e) => toggleSelectDateGroup(items, e)} className={`transition-all duration-200 active:scale-90 ${isAllSelected ? 'opacity-100 text-orange-500' : 'opacity-0 group-hover/date:opacity-100 text-muted hover:text-foreground'}`}>
+                                <CheckCircle2 size={18} />
+                            </button>
+                            <h2 className="text-sm font-semibold text-foreground">{date}</h2>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
+                                {items.map((item) => {
+                                    const isSelected = selectedIds.includes(item.id);
+                                    const isVideo = item.mimetype.startsWith("video/");
+                                    const isHovered = hoveredId === item.id;
+                                    const imageSrc = (isVideo && isHovered) ? `/api/media/${item.id}?size=sprite` : `/api/media/${item.id}?size=small`;
+                                    return(
+                                        <div key={item.id} onClick={() => isSelectionMode ? toggleSelect(item.id) : setSelectedIndex(mediaItems.indexOf(item))} onMouseEnter={() => isVideo && setHoveredId(item.id)} onMouseLeave={() => isVideo && setHoveredId(null)} className={`relative group aspect-square bg-surface overflow-hidden cursor-pointer transition-all duration-300 ${ isSelected ? 'ring-4 ring-orange-500 ring-inset' : 'hover:ring-2 ring-orange-500'}`}>
+                                        <img src={imageSrc} alt={item.filename} className={`w-full h-full object-cover transition-transform duration-500 ${isSelected ? 'scale-90 opacity-80' : 'group-hover:scale-110'}`} loading="lazy" />
+                                        
+                                        {isVideo && !isHovered && (
+                                            <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-background/60 backdrop-blur-md rounded border border-white/10 text-[10px] font-bold text-foreground flex items-center gap-1 shadow">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                                {item.duration ? formatDuration(item.duration) : "VIDEO"}
+                                            </div>
+                                        )}
+
+                                        <button onClick={(e) => toggleSelect(item.id, e)} className={`absolute top-2 left-2 z-20 transition-all duration-200 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                        <div className={`rounded-full p-0.5 ${isSelected ? 'bg-orange-500 text-foreground' : 'bg-background/40 text-foreground/70 backdrop-blur-md border border-white/20'}`}>
+                                            <CheckCircle2 size={20} />
+                                        </div>
+                                        </button>
+                                        <div className="absolute inset-0 bg-background/0 group-hover:bg-background/10 transition-all duration-200" />
+                                    </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {hasMore && !isTrashPage && !isLockedPage && !isSearchPage && !albumId && (
+                <div ref={loadMoreRef} className="h-20 w-full flex items-center justify-center mt-8">
+                    <span className="text-xs text-muted animate-pulse font-bold tracking-widest">
+                        Loading More...
+                    </span>
+                </div>
+            )}
+
+            {timelinePoints.length > 0 && (
+                <TimelineScrub points={timelinePoints} onScrollTo={handleScrollToSection} />
+            )}
+
+            {selectedIndex !== null && (
+                <Lightbox items={mediaItems} index={selectedIndex} setIndex={(i: number) => setSelectedIndex(i)} onClose={() => setSelectedIndex(null)} albumId={albumId} isOwner={isOwner} allowDownload={allowDownload} />
+            )}
+
+            {showAlbumModal && (
+                <AddToAlbumModal selectedIds={selectedIds} onClose={() => setShowAlbumModal(false)} onSuccess={() => { clearSelection(); }} />
+            )}
+            {showShareModal && (
+                <ShareModal selectedIds={selectedIds} type="media" onClose={() => setShowShareModal(false)} onSuccess={() => { clearSelection(); }} />
+            )}
+        </div>
+    );
+}

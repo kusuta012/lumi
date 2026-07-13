@@ -1,7 +1,7 @@
 name: lumi-dev
 services:
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     ports:
      - "5432:5432"
     environment:
@@ -10,27 +10,88 @@ services:
       POSTGRES_DB: lumi
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumi -d lumi"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+  pgbouncer:
+    image: pgbouncer/pgbouncer:latest
+    container_name: lumi-dev-pgbouncer-1
+    restart: unless-stopped
+    ports:
+      - "6432:6432"
+    environment:
+      POSTGRESQL_HOST: "postgres"
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: "lumi"
+      POSTGRESQL_PASSWORD: "iykykoknoyes"
+      POSTGRESQL_DATABASE: "lumi"
+      PGBOUNCER_POOL_MODE: "transaction"
+      PGBOUNCER_MAX_CLIENT_CONN: "2000"
+      PGBOUNCER_IGNORE_STARTUP_PARAMETERS: "extra_float_digits"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 
   redis:
     image: redis:latest
     ports:
-      - "6379:6379"
+      - "4567:6379"
     volumes:
       - redis_data:/data
   
   minio:
     image: minio/minio:latest
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":5001"
     ports:
-      - "5000:5000"
+      - "5000:9000"
       - "5001:5001"
     environment:
-      - MINIO_ROOT_USER= admin
-      - MINIO_ROOT_PASSWORD= saws
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: sawssawssaws
     volumes:
       - minio_data:/data
+
+  ml:
+    build:
+      context: ./ml
+    ports:
+      - "8000:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
+    restart: unless-stopped
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lumi-dev-worker-1
+    command: npx tsx src/jobs/worker.ts
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://lumi:iykykoknoyes@postgres:5432/lumi"
+      REDIS_URL: "redis://redis:6379"
+      MINIO_ENDPOINT: "minio"
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: "admin"
+      MINIO_SECRET_KEY: "sawssawssaws"
+      MINIO_BUCKET: "lumi-media"
+      ML_API_URL: "http://ml:8000"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      AUTH_SECRET: "d420be4dba7f4f8938595feb956cb8d423c580026904435ce76ecab8568c4074"
+    depends_on:
+      - postgres
+      - pgbouncer
+      - redis
+      - minio
+      - ml
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  huggingface_cache:

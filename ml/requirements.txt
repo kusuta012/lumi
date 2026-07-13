@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+torch
+torchvision
+transformers
+opencv-python-headless
+Pillow
+pydantic
+python-multipart
+easyocr
+insightface
+onnxruntime
+optimum[onnxruntime]
+pyiqa
+psutil

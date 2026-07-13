@@ -1,0 +1,204 @@
+"use server";
+
+import { db } from "@/db";
+import { albums, albumMedia, media, albumContributors } from "@/db/schema";
+import { auth } from "@/server/auth";
+import { revalidatePath } from "next/cache";
+import { eq, and, inArray, desc } from "drizzle-orm";
+import { addMediaToPipe } from "@/lib/queue";
+import { cacheInvalid } from "@/lib/cache";
+import { logAuditEvent } from "@/lib/audit";
+import { broadcastAlbumUpdate } from "@/lib/pubsub";
+import { getAlbumRole, hasPermission } from "../services/rbac";
+import { Owner$ } from "@aws-sdk/client-s3";
+
+
+export async function addToAlbumAction(mediaIds: string[], albumName: string) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        const [newAlbum] = await db.insert(albums).values({
+            name: albumName,
+            ownerId: session.user.id,
+            coverMediaId: mediaIds[0],
+        }).returning();
+
+        const entries = mediaIds.map((id) => ({
+            albumId: newAlbum.id,
+            mediaId: id,
+        }));
+
+        await db.insert(albumMedia).values(entries);
+        await broadcastAlbumUpdate(newAlbum.id);
+
+        await cacheInvalid.onAlbumChanged(session.user.id);
+        revalidatePath("/albums");
+        revalidatePath("/photos");
+
+        return { success: true, albumId: newAlbum.id };
+    } catch (error) {
+        console.error("Failed to create album", error);
+        return {success: false, error: "Failed to create alum" };
+    }
+}
+
+export async function createEmptyAlbumAction(name: string) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        const [newAlbum] = await db.insert(albums).values({
+            name,
+            ownerId: session.user.id,
+            coverMediaId: null,
+        }).returning();
+        await cacheInvalid.onAlbumChanged(session.user.id);
+        revalidatePath("/albums");
+        return { success: true, albumId: newAlbum.id};
+    } catch (error) {
+        return {success: false, error: "Failed to create empty album"};
+    }
+}
+
+export async function addMediaToExistingAlbumAction(albumId: string, mediaIds: string[]) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        const role = await getAlbumRole(albumId, session.user.id);
+        if (!hasPermission(role, 'contribute')) {
+            return { success: false, error: "You do not have permission to add photos to this album" };
+        }
+        const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
+        if (!album) throw new Error("Not found");
+
+        const entries = mediaIds.map((id) => ({ albumId, mediaId: id }));
+        await db.insert(albumMedia).values(entries).onConflictDoNothing();
+        await broadcastAlbumUpdate(albumId);
+        if (!album.coverMediaId && mediaIds.length > 0) {
+            await db.update(albums).set({ coverMediaId: mediaIds[0] }).where(eq(albums.id, albumId));
+        }
+        await cacheInvalid.onAlbumChanged(session.user.id);
+        revalidatePath("/albums");
+        revalidatePath(`/albums/${albumId}`);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Failed to add to album"};
+    }
+}
+
+export async function deleteAlbumAction(albumId: string) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        const role = await getAlbumRole(albumId, session.user.id);
+        if (!hasPermission(role, 'delete')) {
+            return { success: false, error: "Only the album owner can delete the entire album" }
+        }
+        const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
+        await db.transaction(async (tx) => {
+            await tx.delete(albumMedia).where(eq(albumMedia.albumId, albumId));
+            await tx.delete(albums).where(and(eq(albums.id, albumId), eq(albums.ownerId, session.user.id)));
+        });
+        await cacheInvalid.onAlbumChanged(session.user.id);
+        await logAuditEvent(
+            "album_deleted",
+            "album",
+            albumId,
+            { name: album?.name || "Unknown" }
+        );
+        revalidatePath("/albums", "layout");
+        return { success: true };
+    } catch (error) {
+        console.error("ALBUM DELETE FIALED", error);
+        return { success: false, error: "Failed to delete album"};
+    }
+}
+
+export async function updateAlbumAction(albumId: string, data: { name?: string, description?: string, coverMediaId?: string}) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        const role = await getAlbumRole(albumId, session.user.id);
+        if (!hasPermission(role, 'manage')) {
+            return { success: false, error: "You do not have permission to edit this album's details" };
+        }
+
+        await db.update(albums)
+            .set({
+                ...(data.name && { name: data.name }),
+                ...(data.description !== undefined && { description: data.description }),
+                ...(data.coverMediaId && { coverMediaId: data.coverMediaId })
+            })
+            .where(eq(albums.id, albumId));
+
+        await cacheInvalid.onAlbumChanged(session.user.id);
+        revalidatePath("/albums");
+        revalidatePath(`/albums/${albumId}`);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Failed to update album"};
+    }
+}
+
+export async function uploadNewCoverAction(albumId: string, data: { filename: string, mimetype: string, size: number, objectKey: string }) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        const role = await getAlbumRole(albumId, session.user.id);
+        if (!hasPermission(role, 'manage')) {
+            return { success: false, error: "Unauthroized" };
+        }
+        const [newMedia] = await db.insert(media).values({
+            ownerId: session.user.id,
+            filename: data.filename,
+            mimetype: data.mimetype,
+            size: data.size,
+            objectKey: data.objectKey,
+            hash: "pending",
+        }).returning();
+
+        await addMediaToPipe(newMedia.id);
+        await db.insert(albumMedia).values({ albumId, mediaId: newMedia.id });
+        await db.update(albums).set({ coverMediaId: newMedia.id }).where(eq(albums.id, albumId));
+
+        await cacheInvalid.onAlbumChanged(session.user.id);
+        revalidatePath("/albums");
+        revalidatePath(`/albums/${albumId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("cover upload error", error);
+        return { success: false, error:  "Failed to upload cover"}
+    }
+}
+
+export async function getAvailableAlbum() {
+    const session = await auth();
+    if (!session?.user?.id) return [];
+
+    const owned = await db.query.albums.findMany({
+        where: eq(albums.ownerId, session.user.id),
+        orderBy: [desc(albums.createdAt)]
+    });
+
+    const contributed = await db.select({
+        id: albums.id,
+        name: albums.name,
+        ownerId: albums.ownerId,
+        coverMediaId: albums.coverMediaId,
+        description: albums.description,
+        createdAt: albums.createdAt
+    }).from(albums)
+    .innerJoin(albumContributors, eq(albumContributors.albumId, albums.id))
+    .where(and(
+        eq(albumContributors.userId, session.user.id),
+        inArray(albumContributors.role, ['contributor', 'co_owner'])
+    ));
+
+    const all = [...owned, ...contributed];
+    return all.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+}
