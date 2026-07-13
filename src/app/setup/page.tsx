@@ -54,9 +54,7 @@ export default function SetupPage() {
                     ))}
                     <div className="bg-surface border border-border rounded-2xl p-8">
                         <div className="flex items-center justify-center gap-3 mb-6">
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-green-500 flex items-center justify-center">
-                                <span className="text-white font-bold text-lg">L</span>
-                            </div>
+                            <img src="/favicon.ico" alt="lumi" className="w-9 h-9 rounded" />
                             <span className="text-xl font-bold tracking-tight text-foreground">Lumi</span>
                         </div>
                         <div className="flex items-center justify-center gap-2 mb-8"> 
