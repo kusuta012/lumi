@@ -35,9 +35,7 @@ export default function Sidebar({ userRole, permissions, storageUsed = 0, storag
     return (
         <aside className="w-64 bg-surface flex flex-col border-r border-border h-full">
             <div className="h-16 flex items-center px-6 gap-3 shrink-0">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-green-500 flex items-center justify-center shadow-lg">
-                    <span className="text-foreground font-bold text-lg">L</span>
-                </div>
+                <img src="/favicon.ico" alt="lumi" className="w-8 h-8 rounded" />
                 <span className="text-xl font-bold tracking-tight text-foreground">Lumi</span>
             </div>
             <div className="flex-1 overflow-y-auto py-4 px-3 space-y-8 custom-scrollbar">
@@ -80,15 +78,6 @@ export default function Sidebar({ userRole, permissions, storageUsed = 0, storag
                     <div className="w-full h-1.5 bg-background/50 border border-border rounded-full overflow-hidden">
                         <div className="bg-orange-500 h-full transition-all duration-1000" style={{ width: `${percentUsed}%` }} />
                     </div>
-                </div>
-                <div className="flex items-center justify-between mt-4 text-[10px] text-muted px-1">
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                        <span className="text-muted tracking-wider text-[10px]">
-                            Server Online
-                        </span>
-                    </div>
-                    <Info className="w-4 h-4 cursor-pointer hover:text-foreground" />
                 </div>
             </div>
         </aside>

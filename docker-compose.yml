@@ -16,20 +16,21 @@ services:
       timeout: 3s
       retries: 5
   pgbouncer:
-    image: pgbouncer/pgbouncer:latest
+    image: edoburu/pgbouncer:latest
     container_name: lumi-dev-pgbouncer-1
     restart: unless-stopped
     ports:
-      - "6432:6432"
+      - "6432:5432"
     environment:
-      POSTGRESQL_HOST: "postgres"
-      POSTGRESQL_PORT: "5432"
-      POSTGRESQL_USERNAME: "lumi"
-      POSTGRESQL_PASSWORD: "iykykoknoyes"
-      POSTGRESQL_DATABASE: "lumi"
-      PGBOUNCER_POOL_MODE: "transaction"
-      PGBOUNCER_MAX_CLIENT_CONN: "2000"
-      PGBOUNCER_IGNORE_STARTUP_PARAMETERS: "extra_float_digits"
+      AUTH_TYPE: "scram-sha-256"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "lumi"
+      DB_PASSWORD: "iykykoknoyes"
+      DB_NAME: "lumi"
+      POOL_MODE: "transaction"
+      MAX_CLIENT_CONN: "2000"
+      IGNORE_STARTUP_PARAMETERS: "extra_float_digits"
     depends_on:
       postgres:
         condition: service_healthy
