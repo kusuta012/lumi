@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Tag } from "lucide-react";
 
 export interface ScrubberPoint {
     label: string;
     month: string;
     index: number;
+    jumpYear?: number;
+    jumpMonth?: number;
 }
 
 interface Props {
     points: ScrubberPoint[];
-    onScrollTo: (index: number) => void;
+    onScrollTo: (index: number, jumpYear?: number, jumpMonth?: number) => void;
 }
 
 export default function TimelineScrub({ points, onScrollTo }: Props) {
@@ -79,7 +80,7 @@ export default function TimelineScrub({ points, onScrollTo }: Props) {
                         const isYear = cp.label !== "";
                         const displayText = isYear ? cp.label : cp.month;
                         return (
-                            <div key={i} onClick={() => onScrollTo(cp.index)} className={`scrubber-item relative flex items-center justify-end w-full cursor-pointer group transition-shadow duration-200 ${isYear ? 'mt-2 mb-1' : ''}`}>
+                            <div key={i} onClick={() => onScrollTo(cp.index, cp.jumpYear, cp.jumpMonth)} className={`scrubber-item relative flex items-center justify-end w-full cursor-pointer group transition-shadow duration-200 ${isYear ? 'mt-2 mb-1' : ''}`}>
                                     <span className={`tracking tighter ${
                                         isYear
                                             ? 'font-black text-foreground text-[11px]'

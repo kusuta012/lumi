@@ -31,6 +31,7 @@ interface Props {
     initialMedia: MediaItem[];
     startYear: number;
     endYear: number;
+    allYearMonths?: { year: number; month: number }[];
     emptyMessage?: string;
     isTrashPage?: boolean;
     isLockedPage?: boolean;
@@ -47,7 +48,7 @@ function formatDuration(seconds: number | null | undefined): string {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export default function TimelineGallery({ initialMedia, startYear, endYear, emptyMessage, isTrashPage = false,  isLockedPage = false, isSearchPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
+export default function TimelineGallery({ initialMedia, startYear, endYear, allYearMonths, emptyMessage, isTrashPage = false,  isLockedPage = false, isSearchPage = false, albumId, isOwner = true, allowDownload = true }: Props) {
     const { notify } = useNotification();
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -69,6 +70,7 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         rootMargin: '600px',
     });
     const router = useRouter();
+    const pendingScrollYearRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!albumId) return;
@@ -130,6 +132,40 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         }
     }, [cursor, hasMore, isLoadingMore, isTrashPage, isLockedPage, albumId]);
 
+    const jumpToDate = useCallback(async (year: number, month?: number) => {
+        if (isLoadingMore) return;
+        setIsLoadingMore(true);
+        try {
+            const res = await fetch(`/api/photos/timeline?jumpToYear=${year}${month ? `&jumpToMonth=${month}` : ''}`);
+            if (res.ok) {
+                const json = await res.json();
+                const newPhotos = json.data.map((m: any) => ({
+                    ...m,
+                    dateTaken: m.dateTaken ? new Date(m.dateTaken) : null,
+                    createdAt: new Date(m.createdAt)
+                }));
+
+                setMediaItems(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const unique = newPhotos.filter((m: MediaItem) => !existingIds.has(m.id));
+                    const merged = [...prev, ...unique];
+                    merged.sort((a: MediaItem, b: MediaItem) => {
+                        const timeA = new Date(a.dateTaken || a.createdAt).getTime();
+                        const timeB = new Date(b.dateTaken || b.createdAt).getTime();
+                        return timeB - timeA;
+                    });
+                    return merged;
+                });
+                
+                pendingScrollYearRef.current = year;
+            }
+        } catch (err) {
+            console.error("failed to jump year", year);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [isLoadingMore]);
+
     useEffect(() => {
         if (inView) {
             loadMorePhotos();
@@ -179,33 +215,86 @@ export default function TimelineGallery({ initialMedia, startYear, endYear, empt
         overscan: 4,
     })
 
+    useEffect(() => {
+        const targetYear = pendingScrollYearRef.current;
+        if (targetYear === null) return;
+
+        const groupIndex = sortedGroups.findIndex(([, items]) => {
+            const d = new Date(items[0].dateTaken || items[0].createdAt);
+            return d.getFullYear() === targetYear;
+        });
+
+        if (groupIndex >= 0) {
+            pendingScrollYearRef.current = null;
+            virtualizer.scrollToIndex(groupIndex, { align: 'start' });
+        }
+    }, [sortedGroups, virtualizer]);
+
     const timelinePoints = useMemo(() => {
         const points: ScrubberPoint[] =[];
         const seenYears = new Set<string>();
         const seenYearMonths = new Set<string>();
+        const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const loadedYearMonths = new Set<string>();
 
         sortedGroups.forEach(([dateString, items], index) => {
             const date = new Date(items[0].dateTaken || items[0].createdAt);
-            const year = date.getFullYear().toString();
-            const month = date.toLocaleDateString('en-US', { month: 'short' });
-            const yearMonthKey = `${year}-${month}`;
-
-            if (!seenYears.has(year)) {
-                seenYears.add(year);
-                points.push({ label: year, month, index });
-            }
-
-            if (!seenYearMonths.has(yearMonthKey)) {
-                seenYearMonths.add(yearMonthKey);
-                points.push({ label: "", month, index });
-            }
+            loadedYearMonths.add(`${date}.getFullYear()-${date.getMonth() + 1}`);
         });
 
-        return points;
-    }, [sortedGroups]);
+        if (allYearMonths && allYearMonths.length > 0) {
+            allYearMonths.forEach(({ year, month }) => {
+                const yearStr = year.toString();
+                const monthStr = monthNames[month];
+                const yearMonthKey = `${year}-${month}`;
+                
+                let groupIndex = -1;
+                if (loadedYearMonths.has(yearMonthKey)) {
+                    groupIndex = sortedGroups.findIndex(([, items]) => {
+                        const d = new Date(items[0].dateTaken || items[0].createdAt);
+                        return d.getFullYear() === year && d.getMonth() + 1 === month;
+                    });
+                }
 
-    const handleScrollToSection = (index: number) => {
-        virtualizer.scrollToIndex(index, { align: "start" });
+                if (!seenYears.has(yearStr)) {
+                    seenYears.add(yearStr);
+                    points.push({ label: yearStr, month: monthStr, index: groupIndex, jumpYear: groupIndex === -1 ? year: undefined });
+                }
+
+                if (!seenYearMonths.has(yearMonthKey)) {
+                    seenYearMonths.add(yearMonthKey);
+                    points.push({ label: "", month: monthStr, index: groupIndex, jumpYear: groupIndex === -1 ? year : undefined, jumpMonth: groupIndex === -1 ? month : undefined });
+                }
+            });
+        } else {
+            sortedGroups.forEach(([dateString, items], index) => {
+                const date = new Date(items[0].dateTaken || items[0].createdAt);
+                const year = date.getFullYear().toString();
+                const month = date.toLocaleDateString('en-US', { month: 'short' });
+                const yearMonthKey = `${year}-${month}`;
+                if (!seenYears.has(year)) {
+                    seenYears.add(year);
+                    points.push({ label: year, month, index });
+                }
+
+                if (!seenYearMonths.has(yearMonthKey)) {
+                    seenYearMonths.add(yearMonthKey);
+                    points.push({ label: "", month, index });
+                }
+            });
+        }
+
+        return points;
+    }, [sortedGroups, allYearMonths]);
+
+    const handleScrollToSection = (index: number, jumpYear?: number, jumpMonth?: number) => {
+        if (jumpYear !== undefined) {
+            jumpToDate(jumpYear, jumpMonth);
+            return;
+        }
+        if (index >= 0) {
+            virtualizer.scrollToIndex(index, { align: "start" });
+        }
     };
 
     const toggleSelect = (id: string, e?: React.MouseEvent) => {

@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const cursor = searchParams.get("cursor");
+    const jumpToYear = searchParams.get("jumpToYear");
+    const jumpToMonth = searchParams.get("jumpToMonth");
     const limit = 50;
 
     try {
@@ -21,11 +23,20 @@ export async function GET(req: NextRequest) {
             eq(media.isLocked, false)
         );
 
-        if (cursor && cursor !== "null") {
+        if (jumpToYear) {
+            const month = jumpToMonth ? parseInt(jumpToMonth) : 12;
+            const startMonth = jumpToMonth ? parseInt(jumpToMonth) : 1;
+            const lastDay =  new Date(parseInt(jumpToYear), month, 0).getDate();
+            const yearEnd = `${jumpToYear}-${String(month).padStart(2, '0')}-${lastDay}T23:59:59.999Z`;
+            baseCondition = and(
+                baseCondition,
+                sql`COALESCE(${media.dateTaken}, ${media.createdAt}) <= ${yearEnd}::timestamp`
+            );
+        } else if (cursor && cursor !== "null") {
             baseCondition = and(
                 baseCondition,
                 sql`(COALESCE(${media.dateTaken}, ${media.createdAt}), ${media.id}) < (${cursor}::timestamp, ${cursorId}::uuid)`
-            );
+            )
         }
 
         const photos = await db.query.media.findMany({

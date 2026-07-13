@@ -32,11 +32,27 @@ export default async function PhotosPage() {
         }));
     }
 
+    const yearMonths = await db.select({
+        year: sql<number>`EXTRACT(YEAR FROM COALESCE(${media.dateTaken},${media.createdAt}))::int`.as('year'),
+        month: sql<number>`EXTRACT(MONTH FROM COALESCE(${media.dateTaken},${media.createdAt}))::int`.as('month'),
+    }).from(media).where(
+        and(
+            eq(media.ownerId, session.user.id),
+            eq(media.isDeleted, false),
+            eq(media.isArchived, false),
+            eq(media.isLocked, false)
+        )
+    ).groupBy(
+        sql`EXTRACT(YEAR FROM COALESCE(${media.dateTaken}, ${media.createdAt}))`,sql`EXTRACT(MONTH FROM COALESCE(${media.dateTaken}, ${media.createdAt}))`
+    ).orderBy(
+        sql`EXTRACT(YEAR FROM COALESCE(${media.dateTaken}, ${media.createdAt})) DESC`,sql`EXTRACT(MONTH FROM COALESCE(${media.dateTaken}, ${media.createdAt})) DESC`
+    );
+
     const years = userMedia.map((m: any) => new Date(m.dateTaken || m.createdAt).getFullYear());    
     const startYear = years.length > 0 ? years[0] : new Date().getFullYear();
     const endYear = years.length > 0 ? years[years.length -1] : startYear;
 
     return (
-        <TimelineGallery initialMedia={userMedia} startYear={startYear} endYear={endYear} emptyMessage="You don't have any media." />
+        <TimelineGallery initialMedia={userMedia} startYear={startYear} endYear={endYear} allYearMonths={yearMonths} emptyMessage="You don't have any media." />
     );
 }
